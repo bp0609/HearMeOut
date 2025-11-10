@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mood-journal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: mood_journal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d mood_journal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ML Service (Python Flask)
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: mood-journal-ml
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - temp_audio:/app/temp_audio
+    environment:
+      - FLASK_ENV=development
+      - MODEL_CACHE_DIR=/app/model_cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
+  temp_audio:
+    driver: local

@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+.env
+.venv
+venv/
+env/
+temp_audio/
+model_cache/
+.git
+.gitignore
+README.md
+.DS_Store
