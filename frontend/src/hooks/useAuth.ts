@@ -8,21 +8,17 @@ export function useAuth() {
   const { isLoaded, isSignedIn, getToken } = useClerkAuth();
   const { user } = useUser();
 
-  // Set auth token when user signs in
+  // Provide getToken function to API client for dynamic token fetching
   useEffect(() => {
-    async function setToken() {
-      if (isSignedIn) {
-        const token = await getToken();
-        if (token) {
-          api.setAuthToken(token);
-        }
-      } else {
-        api.removeAuthToken();
-      }
-    }
-
     if (isLoaded) {
-      setToken();
+      if (isSignedIn) {
+        // Give API client access to getToken function
+        // Token will be fetched fresh for each request via interceptor
+        api.setTokenGetter(getToken);
+      } else {
+        // Clear token getter on sign out
+        api.clearTokenGetter();
+      }
     }
   }, [isLoaded, isSignedIn, getToken]);
 

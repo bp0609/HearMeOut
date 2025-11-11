@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useCalendarData } from '@/hooks/useMoodData';
+import { useAuth } from '@/hooks/useAuth';
 import { getDaysInMonth, getFirstDayOfMonth, formatDate, isToday } from '@/lib/utils';
 import { DAYS_OF_WEEK, MONTHS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -11,8 +12,12 @@ export function MoodCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+  const { isLoaded } = useAuth();
 
   const { calendarData, loading } = useCalendarData(year, month + 1);
+
+  // Show loading state while auth is initializing
+  const isActuallyLoading = loading || !isLoaded;
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDayOfMonth = getFirstDayOfMonth(year, month);
@@ -91,7 +96,7 @@ export function MoodCalendar() {
       </div>
 
       {/* Calendar grid */}
-      {loading ? (
+      {isActuallyLoading ? (
         <div className="text-center py-12 text-muted-foreground">
           Loading calendar...
         </div>

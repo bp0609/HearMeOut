@@ -13,6 +13,7 @@ import {
 
 class ApiClient {
   private client: AxiosInstance;
+  private getTokenFn: (() => Promise<string | null>) | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -21,20 +22,38 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
     });
+
+    // Request interceptor to dynamically add fresh token to every request
+    this.client.interceptors.request.use(
+      async (config) => {
+        if (this.getTokenFn) {
+          try {
+            const token = await this.getTokenFn();
+            if (token) {
+              config.headers.Authorization = `Bearer ${token}`;
+            }
+          } catch (error) {
+            console.error('Error fetching auth token:', error);
+          }
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
   }
 
   /**
-   * Set authorization token
+   * Set the token getter function (called from useAuth hook)
    */
-  setAuthToken(token: string) {
-    this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  setTokenGetter(fn: () => Promise<string | null>) {
+    this.getTokenFn = fn;
   }
 
   /**
-   * Remove authorization token
+   * Clear the token getter function (on sign out)
    */
-  removeAuthToken() {
-    delete this.client.defaults.headers.common['Authorization'];
+  clearTokenGetter() {
+    this.getTokenFn = null;
   }
 
   // Mood Entry endpoints
