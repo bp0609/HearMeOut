@@ -1,6 +1,7 @@
 // Hook for fetching and managing mood data
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './useAuth';
 import { api } from '@/lib/api';
 import { MoodEntry, CalendarDay } from '@/types';
 
@@ -8,8 +9,11 @@ export function useMoodData() {
   const [entries, setEntries] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isTokenSet } = useAuth();
 
   const fetchEntries = useCallback(async (params?: { startDate?: string; endDate?: string; limit?: number }) => {
+    if (!isTokenSet) return; // Don't fetch until token is set
+
     try {
       setLoading(true);
       setError(null);
@@ -21,11 +25,13 @@ export function useMoodData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isTokenSet]);
 
   useEffect(() => {
-    fetchEntries();
-  }, [fetchEntries]);
+    if (isTokenSet) {
+      fetchEntries();
+    }
+  }, [fetchEntries, isTokenSet]);
 
   return {
     entries,
@@ -39,8 +45,11 @@ export function useCalendarData(year: number, month: number) {
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isTokenSet } = useAuth();
 
   const fetchCalendarData = useCallback(async () => {
+    if (!isTokenSet) return; // Don't fetch until token is set
+
     try {
       setLoading(true);
       setError(null);
@@ -52,11 +61,13 @@ export function useCalendarData(year: number, month: number) {
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, isTokenSet]);
 
   useEffect(() => {
-    fetchCalendarData();
-  }, [fetchCalendarData]);
+    if (isTokenSet) {
+      fetchCalendarData();
+    }
+  }, [fetchCalendarData, isTokenSet]);
 
   return {
     calendarData,
@@ -70,9 +81,12 @@ export function useMoodEntryByDate(date: string) {
   const [entry, setEntry] = useState<MoodEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isTokenSet } = useAuth();
 
   useEffect(() => {
     async function fetchEntry() {
+      if (!isTokenSet) return; // Don't fetch until token is set
+
       try {
         setLoading(true);
         setError(null);
@@ -87,10 +101,10 @@ export function useMoodEntryByDate(date: string) {
       }
     }
 
-    if (date) {
+    if (date && isTokenSet) {
       fetchEntry();
     }
-  }, [date]);
+  }, [date, isTokenSet]);
 
   return {
     entry,

@@ -1,12 +1,16 @@
 // Clerk Authentication Middleware
 
 import { Request, Response, NextFunction } from 'express';
-import { clerkClient } from '@clerk/clerk-sdk-node';
+import { getAuth } from '@clerk/express';
 import { AuthenticatedRequest } from '../types';
 import { prisma } from '../services/prisma';
 
 /**
- * Middleware to verify Clerk JWT and attach user info to request
+ * Middleware to verify authentication and ensure user exists in database
+ * Should be used after clerkMiddleware() in the chain
+ * 
+ * This is a custom middleware that checks req.auth (populated by clerkMiddleware)
+ * and returns an error instead of redirecting (different from default requireAuth behavior)
  */
 export async function requireAuth(
   req: Request,
@@ -14,39 +18,23 @@ export async function requireAuth(
   next: NextFunction
 ): Promise<void> {
   try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Missing or invalid authorization header' });
+    // Use getAuth() from @clerk/express to get auth state
+    const auth = getAuth(req);
+
+    // Check if user is authenticated
+    if (!auth?.userId) {
+      res.status(401).json({ error: 'Unauthenticated' });
       return;
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    // Attach auth to request for downstream handlers
+    (req as AuthenticatedRequest).auth = auth;
 
-    // Verify token with Clerk
-    try {
-      const session = await clerkClient.sessions.verifySession(token, token);
+    // Ensure user exists in our database (fallback in case webhook didn't fire)
+    // Primary user creation happens via webhook at signup
+    await ensureUserExists(auth.userId);
 
-      if (!session || !session.userId) {
-        res.status(401).json({ error: 'Invalid session' });
-        return;
-      }
-
-      // Attach auth info to request
-      (req as AuthenticatedRequest).auth = {
-        userId: session.userId,
-        sessionId: session.id,
-      };
-
-      // Ensure user exists in our database
-      await ensureUserExists(session.userId);
-
-      next();
-    } catch (clerkError) {
-      console.error('Clerk verification error:', clerkError);
-      res.status(401).json({ error: 'Authentication failed' });
-      return;
-    }
+    next();
   } catch (error) {
     console.error('Auth middleware error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -77,6 +65,7 @@ async function ensureUserExists(clerkId: string): Promise<void> {
 
 /**
  * Optional auth middleware - attaches user if authenticated, but doesn't require it
+ * Should be used after clerkMiddleware() in the chain
  */
 export async function optionalAuth(
   req: Request,
@@ -84,18 +73,17 @@ export async function optionalAuth(
   next: NextFunction
 ): Promise<void> {
   try {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const session = await clerkClient.sessions.verifySession(token, token);
+    // Use getAuth() from @clerk/express to get auth state
+    const auth = getAuth(req);
 
-      if (session && session.userId) {
-        (req as AuthenticatedRequest).auth = {
-          userId: session.userId,
-          sessionId: session.id,
-        };
-      }
+    // Attach auth to request
+    (req as AuthenticatedRequest).auth = auth;
+
+    // If authenticated, ensure user exists in database
+    if (auth?.userId) {
+      await ensureUserExists(auth.userId);
     }
+
     next();
   } catch (error) {
     // Silently fail for optional auth

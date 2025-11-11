@@ -1,13 +1,11 @@
 // Type definitions for the backend
 
 import { Request } from 'express';
+import type { AuthObject } from '@clerk/express';
 
 // Extend Express Request to include Clerk auth
 export interface AuthenticatedRequest extends Request {
-  auth: {
-    userId: string;
-    sessionId?: string;
-  };
+  auth: AuthObject;
 }
 
 // ML Service Response Types
