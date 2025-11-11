@@ -1,13 +1,12 @@
 // Mood Entry Routes
 
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../services/prisma';
 import { analyzeAudio } from '../services/mlService';
 import { checkForPatterns } from '../services/patternDetection';
 import { audioUpload, deleteAudioFile } from '../middleware/fileUpload';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../types';
 
 const router = Router();
 
@@ -30,8 +29,8 @@ const updateMoodSchema = z.object({
 router.post(
   '/',
   audioUpload.single('audio'),
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const file = req.file;
 
     if (!file) {
@@ -119,8 +118,8 @@ router.post(
  */
 router.patch(
   '/:id',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const { id } = req.params;
 
     // Validate request body
@@ -159,8 +158,8 @@ router.patch(
  */
 router.get(
   '/',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const { startDate, endDate, limit = '30' } = req.query;
 
     const where: any = { userId };
@@ -211,8 +210,8 @@ router.get(
  */
 router.get(
   '/date/:date',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const { date } = req.params;
 
     const entryDate = new Date(date);
@@ -258,8 +257,8 @@ router.get(
  */
 router.delete(
   '/:id',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const { id } = req.params;
 
     await prisma.moodEntry.delete({

@@ -1,9 +1,9 @@
 // Progress and Analytics Routes
 
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { prisma } from '../services/prisma';
 import { asyncHandler } from '../middleware/errorHandler';
-import { AuthenticatedRequest, ProgressSummaryResponse } from '../types';
+import { ProgressSummaryResponse } from '../types';
 import { getActiveAlerts, dismissAlert } from '../services/patternDetection';
 
 const router = Router();
@@ -14,8 +14,8 @@ const router = Router();
  */
 router.get(
   '/summary',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const { days = '30' } = req.query;
 
     const daysBack = parseInt(days as string);
@@ -88,8 +88,8 @@ router.get(
  */
 router.get(
   '/alerts',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const alerts = await getActiveAlerts(userId);
 
     const formattedAlerts = alerts.map(alert => ({
@@ -113,8 +113,8 @@ router.get(
  */
 router.post(
   '/alerts/:id/dismiss',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const { id } = req.params;
 
     await dismissAlert(id, userId);
@@ -132,8 +132,8 @@ router.post(
  */
 router.get(
   '/calendar/:year/:month',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.auth.userId;
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.auth!.userId;
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
 

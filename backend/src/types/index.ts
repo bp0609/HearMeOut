@@ -2,13 +2,27 @@
 
 import { Request } from 'express';
 
-// Extend Express Request to include Clerk auth
-export interface AuthenticatedRequest extends Request {
+// Declare global augmentation for Express Request
+// Clerk's clerkMiddleware() and getAuth() attach auth to the Request object
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: {
+        userId: string;
+        sessionId: string;
+      };
+    }
+  }
+}
+
+// Type alias for authenticated requests (after requireAuth middleware)
+// Auth is guaranteed to exist after passing through requireAuth
+export type AuthenticatedRequest = Request & {
   auth: {
     userId: string;
-    sessionId?: string;
+    sessionId: string;
   };
-}
+};
 
 // ML Service Response Types
 export interface EmotionScore {
