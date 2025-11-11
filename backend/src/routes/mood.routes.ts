@@ -237,16 +237,13 @@ router.get(
       },
     });
 
-    if (!entry) {
-      throw new AppError(404, 'Mood entry not found for this date');
-    }
-
+    // Return 200 with null data if no entry exists (not an error - just no data for this date)
     res.json({
       success: true,
-      data: {
+      data: entry ? {
         ...entry,
         entryDate: entry.entryDate.toISOString().split('T')[0],
-      },
+      } : null,
     });
   })
 );
