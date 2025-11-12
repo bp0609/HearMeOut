@@ -139,7 +139,7 @@ class ApiClient {
     const response = await this.client.post('/api/moods', formData, {
       headers: {
         ...headers,
-        'Content-Type': undefined, // Remove default JSON content type
+        'Content-Type': undefined, // Set to undefined to let Axios auto-detect FormData and set proper multipart/form-data header
       },
     });
 
