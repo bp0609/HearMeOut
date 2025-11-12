@@ -74,7 +74,7 @@ start:
 	@echo "✓ All services started"
 	@echo "  - PostgreSQL: localhost:5432 (Docker)"
 	@echo "  - ML Service: localhost:8000 (Docker)"
-	@echo "  - Backend: localhost:3001 (Local)"
+	@echo "  - Backend: localhost:5001 (Local)"
 	@echo "  - Frontend: localhost:5173 (Local)"
 
 stop:

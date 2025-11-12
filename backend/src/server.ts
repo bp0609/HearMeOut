@@ -3,7 +3,7 @@
 import app from './app';
 import { prisma } from './services/prisma';
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 5001;
 const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces
 
 async function startServer() {
