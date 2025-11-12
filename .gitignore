@@ -172,4 +172,4 @@ model_cache/
 
 **/.venv
 
-Model/wav2vec2-lg-xlsr-en-speech-emotion-recognition/*
+ml-service/wav2vec2-lg-xlsr-en-speech-emotion-recognition/*

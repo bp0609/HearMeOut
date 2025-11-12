@@ -18,9 +18,11 @@ export interface MoodEntry {
 }
 
 export interface MoodEntryCreate {
-  transcription: string;
+  transcription: string | null;
   emotionScores: EmotionScore[];
   suggestedEmojis: string[];
+  predictedEmotion?: string;
+  confidence?: number;
   id: string;
   entryDate: string;
 }

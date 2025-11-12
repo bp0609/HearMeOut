@@ -6,10 +6,13 @@ import fs from 'fs';
 import { Request } from 'express';
 
 // Create temp_audio directory if it doesn't exist
-const TEMP_AUDIO_DIR = path.join(process.cwd(), 'temp_audio');
+// Use /app/temp_audio in Docker, or local temp_audio for development
+const TEMP_AUDIO_DIR = process.env.TEMP_AUDIO_DIR || path.join(process.cwd(), 'temp_audio');
 if (!fs.existsSync(TEMP_AUDIO_DIR)) {
   fs.mkdirSync(TEMP_AUDIO_DIR, { recursive: true });
 }
+
+console.log(`📁 Audio files will be stored in: ${TEMP_AUDIO_DIR}`);
 
 // Configure storage
 const storage = multer.diskStorage({

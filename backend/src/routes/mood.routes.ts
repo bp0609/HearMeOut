@@ -10,6 +10,42 @@ import { asyncHandler, AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
+// Emotion to emoji mapping
+const EMOTION_TO_EMOJIS: Record<string, string[]> = {
+  angry: ['😠', '😡', '😤'],
+  calm: ['😌', '😇', '🙂'],
+  disgust: ['😒', '🙄', '😑'],
+  fearful: ['😰', '😨', '😱'],
+  happy: ['😊', '😄', '🥰'],
+  neutral: ['😐', '😶', '🤔'],
+  sad: ['😢', '😔', '😞'],
+  surprised: ['😮', '😯', '😲'],
+};
+
+// Helper function to get emojis for top emotions
+function getEmojisFromEmotions(topEmotions: Array<{ emotion: string; score: number }>): string[] {
+  const emojis: string[] = [];
+  for (const { emotion } of topEmotions) {
+    const emotionEmojis = EMOTION_TO_EMOJIS[emotion.toLowerCase()] || [];
+    emojis.push(...emotionEmojis.slice(0, 1)); // Take first emoji from each emotion
+  }
+  return emojis.slice(0, 5); // Return max 5 emojis
+}
+
+// Helper function to get database user ID from Clerk ID
+async function getUserIdFromClerk(clerkId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new AppError(404, 'User not found in database');
+  }
+
+  return user.id;
+}
+
 // Validation schemas
 const createMoodSchema = z.object({
   language: z.enum(['en', 'hi', 'gu']).default('en'),
@@ -33,7 +69,7 @@ router.post(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const clerkId = req.auth.userId;
     const file = req.file;
 
     // Debug logging for upload request
@@ -41,7 +77,7 @@ router.post(
       hasAuth: !!req.headers.authorization,
       contentType: req.headers['content-type'],
       hasFile: !!file,
-      userId: userId,
+      clerkId: clerkId,
     });
 
     if (!file) {
@@ -49,6 +85,9 @@ router.post(
     }
 
     try {
+      // Get the user's database ID from Clerk ID
+      const userId = await getUserIdFromClerk(clerkId);
+
       // Validate request body
       const body = createMoodSchema.parse({
         language: req.body.language,
@@ -76,7 +115,10 @@ router.post(
 
       // Call ML service for analysis
       console.log(`Analyzing audio for user ${userId}...`);
-      const mlResult = await analyzeAudio(file.path, body.language);
+      const mlResult = await analyzeAudio(file.path);
+
+      // Get suggested emojis from top emotions
+      const suggestedEmojis = getEmojisFromEmotions(mlResult.top_emotions || []);
 
       // Create mood entry in database
       const moodEntry = await prisma.moodEntry.create({
@@ -85,10 +127,10 @@ router.post(
           entryDate: today,
           duration: body.duration,
           language: body.language,
-          transcription: mlResult.transcription,
-          audioFeatures: mlResult.audioFeatures as any,
-          emotionScores: mlResult.emotionScores as any,
-          suggestedEmojis: mlResult.suggestedEmojis,
+          transcription: null, // We're not doing transcription anymore, just emotion detection
+          audioFeatures: mlResult.all_scores as any, // Store all emotion scores
+          emotionScores: mlResult.top_emotions as any,
+          suggestedEmojis: suggestedEmojis,
         },
         include: {
           user: {
@@ -110,6 +152,8 @@ router.post(
         data: {
           id: moodEntry.id,
           entryDate: moodEntry.entryDate.toISOString().split('T')[0],
+          predictedEmotion: mlResult.predicted_emotion,
+          confidence: mlResult.confidence,
           transcription: moodEntry.transcription,
           emotionScores: moodEntry.emotionScores,
           suggestedEmojis: moodEntry.suggestedEmojis,
@@ -133,7 +177,7 @@ router.patch(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
     // Validate request body
@@ -176,7 +220,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { startDate, endDate, limit = '30' } = req.query;
 
     const where: any = { userId };
@@ -231,7 +275,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { date } = req.params;
 
     const entryDate = new Date(date);
@@ -278,7 +322,7 @@ router.delete(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
     await prisma.moodEntry.delete({

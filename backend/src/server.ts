@@ -4,6 +4,7 @@ import app from './app';
 import { prisma } from './services/prisma';
 
 const PORT = process.env.PORT || 5001;
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces
 
 async function startServer() {
   try {
@@ -12,8 +13,8 @@ async function startServer() {
     console.log('✓ Database connected');
 
     // Start server
-    app.listen(PORT, () => {
-      console.log(`✓ Server running on http://localhost:${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`✓ Server running on http://${HOST}:${PORT}`);
       console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`✓ ML Service URL: ${process.env.ML_SERVICE_URL || 'http://localhost:8000'}`);
     });

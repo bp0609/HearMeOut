@@ -8,6 +8,20 @@ import { getActiveAlerts, dismissAlert } from '../services/patternDetection';
 
 const router = Router();
 
+// Helper function to get database user ID from Clerk ID
+async function getUserIdFromClerk(clerkId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new AppError(404, 'User not found in database');
+  }
+
+  return user.id;
+}
+
 /**
  * GET /api/progress/summary
  * Get mood distribution and weekly summary
@@ -18,7 +32,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { days = '30' } = req.query;
 
     const daysBack = parseInt(days as string);
@@ -95,7 +109,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const alerts = await getActiveAlerts(userId);
 
     const formattedAlerts = alerts.map(alert => ({
@@ -123,7 +137,7 @@ router.post(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
     await dismissAlert(id, userId);
@@ -145,7 +159,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
 
