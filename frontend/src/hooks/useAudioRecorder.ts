@@ -186,7 +186,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         pauseStartTimeRef.current = 0;
       }
 
-      // Resume timer (startTimeRef stays the same - original start time!)
+      // Resume timer using the original start time
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000);
         setDuration(elapsed);
