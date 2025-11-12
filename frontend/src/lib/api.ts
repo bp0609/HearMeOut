@@ -13,6 +13,7 @@ import {
 
 class ApiClient {
   private client: AxiosInstance;
+  private getTokenFn: (() => Promise<string | null>) | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -21,20 +22,64 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
     });
+
+    // Request interceptor to dynamically add fresh token to every request
+    this.client.interceptors.request.use(
+      async (config) => {
+        console.log('[API Interceptor] Request:', {
+          url: config.url,
+          method: config.method,
+          hasTokenGetter: !!this.getTokenFn,
+          isFormData: config.data instanceof FormData,
+          hasAuthHeader: !!config.headers?.Authorization,
+        });
+
+        // Skip if FormData (auth is handled manually in createMoodEntry)
+        if (config.data instanceof FormData) {
+          console.log('[API Interceptor] Skipping FormData - auth handled manually');
+          return config;
+        }
+
+        // Skip if Authorization already set
+        if (config.headers?.Authorization) {
+          console.log('[API Interceptor] Auth header already present');
+          return config;
+        }
+
+        // Add token for non-FormData requests
+        if (this.getTokenFn) {
+          try {
+            const token = await this.getTokenFn();
+            if (token) {
+              config.headers.Authorization = `Bearer ${token}`;
+              console.log('[API Interceptor] Token added to request');
+            } else {
+              console.warn('[API Interceptor] Token getter returned null');
+            }
+          } catch (error) {
+            console.error('[API Interceptor] Error fetching auth token:', error);
+          }
+        } else {
+          console.warn('[API Interceptor] No token getter function set!');
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
   }
 
   /**
-   * Set authorization token
+   * Set the token getter function (called from useAuth hook)
    */
-  setAuthToken(token: string) {
-    this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  setTokenGetter(fn: () => Promise<string | null>) {
+    this.getTokenFn = fn;
   }
 
   /**
-   * Remove authorization token
+   * Clear the token getter function (on sign out)
    */
-  removeAuthToken() {
-    delete this.client.defaults.headers.common['Authorization'];
+  clearTokenGetter() {
+    this.getTokenFn = null;
   }
 
   // Mood Entry endpoints
@@ -47,17 +92,58 @@ class ApiClient {
     language: string,
     duration: number
   ): Promise<MoodEntryCreate> {
+    console.log('[API] Creating mood entry - preparing FormData...');
+
     const formData = new FormData();
     formData.append('audio', audioFile);
     formData.append('language', language);
     formData.append('duration', duration.toString());
 
+    // Debug: Log FormData contents
+    console.log('[API] FormData contents:');
+    for (let [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: File(name="${value.name}", size=${value.size}, type="${value.type}")`);
+      } else {
+        console.log(`  ${key}:`, value);
+      }
+    }
+
+    // Get fresh token BEFORE making FormData request
+    // This avoids interceptor header mutation issues with FormData
+    const headers: Record<string, string> = {};
+
+    if (this.getTokenFn) {
+      try {
+        console.log('[API] Fetching fresh token for FormData upload...');
+        const token = await this.getTokenFn();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+          console.log('[API] Token added to FormData request headers');
+        } else {
+          console.warn('[API] Token getter returned null - upload may fail');
+        }
+      } catch (error) {
+        console.error('[API] Error getting token:', error);
+        throw new Error('Failed to get authentication token');
+      }
+    } else {
+      console.error('[API] No token getter function available!');
+      throw new Error('Authentication not initialized');
+    }
+
+    console.log('[API] Sending FormData POST request to /api/moods');
+
+    // Explicitly delete Content-Type to override the default 'application/json'
+    // This allows Axios to auto-detect FormData and set proper multipart/form-data
     const response = await this.client.post('/api/moods', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        ...headers,
+        'Content-Type': undefined, // Set to undefined to let Axios auto-detect FormData and set proper multipart/form-data header
       },
     });
 
+    console.log('[API] Upload successful:', response.status);
     return response.data.data;
   }
 

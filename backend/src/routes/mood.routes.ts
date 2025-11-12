@@ -1,13 +1,12 @@
 // Mood Entry Routes
 
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../services/prisma';
 import { analyzeAudio } from '../services/mlService';
 import { checkForPatterns } from '../services/patternDetection';
 import { audioUpload, deleteAudioFile } from '../middleware/fileUpload';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../types';
 
 const router = Router();
 
@@ -30,9 +29,20 @@ const updateMoodSchema = z.object({
 router.post(
   '/',
   audioUpload.single('audio'),
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
     const userId = req.auth.userId;
     const file = req.file;
+
+    // Debug logging for upload request
+    console.log('[Upload] Request received:', {
+      hasAuth: !!req.headers.authorization,
+      contentType: req.headers['content-type'],
+      hasFile: !!file,
+      userId: userId,
+    });
 
     if (!file) {
       throw new AppError(400, 'Audio file is required');
@@ -119,7 +129,10 @@ router.post(
  */
 router.patch(
   '/:id',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
     const userId = req.auth.userId;
     const { id } = req.params;
 
@@ -159,7 +172,10 @@ router.patch(
  */
 router.get(
   '/',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
     const userId = req.auth.userId;
     const { startDate, endDate, limit = '30' } = req.query;
 
@@ -211,7 +227,10 @@ router.get(
  */
 router.get(
   '/date/:date',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
     const userId = req.auth.userId;
     const { date } = req.params;
 
@@ -238,16 +257,13 @@ router.get(
       },
     });
 
-    if (!entry) {
-      throw new AppError(404, 'Mood entry not found for this date');
-    }
-
+    // Return 200 with null data if no entry exists (not an error - just no data for this date)
     res.json({
       success: true,
-      data: {
+      data: entry ? {
         ...entry,
         entryDate: entry.entryDate.toISOString().split('T')[0],
-      },
+      } : null,
     });
   })
 );
@@ -258,7 +274,10 @@ router.get(
  */
 router.delete(
   '/:id',
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
     const userId = req.auth.userId;
     const { id } = req.params;
 

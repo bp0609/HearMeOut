@@ -3,6 +3,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
+import { clerkMiddleware } from '@clerk/express';
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 import moodRoutes from './routes/mood.routes';
@@ -23,6 +24,9 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Clerk middleware for networkless JWT verification
+app.use(clerkMiddleware());
 
 // Health check endpoint (no auth required)
 app.get('/health', async (req: Request, res: Response) => {

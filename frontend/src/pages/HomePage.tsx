@@ -9,9 +9,21 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoaded } = useAuth();
   const today = formatDate(new Date());
-  const { entry } = useMoodEntryByDate(today);
+  const { entry, loading: entryLoading } = useMoodEntryByDate(today);
+
+  // Wait for auth to load before showing content
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl font-semibold text-purple-600 mb-2">Loading...</div>
+          <p className="text-muted-foreground">Authenticating your session</p>
+        </div>
+      </div>
+    );
+  }
 
   const hasTodayEntry = entry !== null;
 

@@ -77,11 +77,13 @@ export function useMoodEntryByDate(date: string) {
         setLoading(true);
         setError(null);
         const data = await api.getMoodEntryByDate(date);
+        // data will be null if no entry exists (200 response with data: null)
         setEntry(data);
       } catch (err) {
+        // This now only catches real errors (network, server, auth failures)
         console.error('Error fetching mood entry:', err);
+        setError('Failed to load mood entry');
         setEntry(null);
-        // Don't set error for 404 - it means no entry for this date
       } finally {
         setLoading(false);
       }
