@@ -13,7 +13,7 @@ const router = Router();
 // Validation schemas
 const createMoodSchema = z.object({
   language: z.enum(['en', 'hi', 'gu']).default('en'),
-  duration: z.number().min(30).max(60),
+  duration: z.number().min(5).max(60),
 });
 
 const updateMoodSchema = z.object({
