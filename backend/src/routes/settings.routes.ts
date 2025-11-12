@@ -3,7 +3,7 @@
 import { Router, Response, Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../services/prisma';
-import { asyncHandler } from '../middleware/errorHandler';
+import { asyncHandler, AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -23,7 +23,10 @@ const updateSettingsSchema = z.object({
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
 
     // Get or create user with settings
     const user = await prisma.user.findUnique({
@@ -65,7 +68,10 @@ router.get(
 router.patch(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
 
     // Validate request body
     const body = updateSettingsSchema.parse(req.body);

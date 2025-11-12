@@ -30,7 +30,10 @@ router.post(
   '/',
   audioUpload.single('audio'),
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const file = req.file;
 
     // Debug logging for upload request
@@ -127,7 +130,10 @@ router.post(
 router.patch(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const { id } = req.params;
 
     // Validate request body
@@ -167,7 +173,10 @@ router.patch(
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const { startDate, endDate, limit = '30' } = req.query;
 
     const where: any = { userId };
@@ -219,7 +228,10 @@ router.get(
 router.get(
   '/date/:date',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const { date } = req.params;
 
     const entryDate = new Date(date);
@@ -263,7 +275,10 @@ router.get(
 router.delete(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const { id } = req.params;
 
     await prisma.moodEntry.delete({

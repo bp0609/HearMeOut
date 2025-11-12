@@ -2,7 +2,7 @@
 
 import { Router, Response, Request } from 'express';
 import { prisma } from '../services/prisma';
-import { asyncHandler } from '../middleware/errorHandler';
+import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { ProgressSummaryResponse } from '../types';
 import { getActiveAlerts, dismissAlert } from '../services/patternDetection';
 
@@ -15,7 +15,10 @@ const router = Router();
 router.get(
   '/summary',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const { days = '30' } = req.query;
 
     const daysBack = parseInt(days as string);
@@ -89,7 +92,10 @@ router.get(
 router.get(
   '/alerts',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const alerts = await getActiveAlerts(userId);
 
     const formattedAlerts = alerts.map(alert => ({
@@ -114,7 +120,10 @@ router.get(
 router.post(
   '/alerts/:id/dismiss',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const { id } = req.params;
 
     await dismissAlert(id, userId);
@@ -133,7 +142,10 @@ router.post(
 router.get(
   '/calendar/:year/:month',
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.auth!.userId;
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = req.auth.userId;
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
 
