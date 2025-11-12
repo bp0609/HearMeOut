@@ -20,12 +20,9 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:5173',
   'https://localhost:5173',
-  'https://localhost:5174',
   'http://127.0.0.1:5173',
   'https://127.0.0.1:5173',
-  'https://127.0.0.1:5174',
   'https://10.7.14.58:5173',
-  'https://10.7.14.58:5174',
   process.env.FRONTEND_URL || 'http://localhost:5173',
 ].filter((origin, index, self) => self.indexOf(origin) === index); // Remove duplicates
 
