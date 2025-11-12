@@ -22,7 +22,7 @@ export default function RecordingPage() {
 
   const handleRecordingComplete = async (audioBlob: Blob, duration: number) => {
     console.log('[Recording] Recording complete callback fired:', {
-      hasBob: !!audioBlob,
+      hasBlob: !!audioBlob,
       blobSize: audioBlob?.size,
       blobType: audioBlob?.type,
       duration,
