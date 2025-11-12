@@ -171,3 +171,5 @@ temp_audio/
 model_cache/
 
 **/.venv
+
+Model/wav2vec2-lg-xlsr-en-speech-emotion-recognition/*
