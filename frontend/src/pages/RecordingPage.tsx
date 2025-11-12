@@ -83,8 +83,8 @@ export default function RecordingPage() {
       console.error('Error headers:', error.response?.headers);
 
       const errorMessage = error.response?.data?.error ||
-                          error.response?.data?.details ||
-                          'Failed to process your recording. Please try again.';
+        error.response?.data?.details ||
+        'Failed to process your recording. Please try again.';
 
       toast({
         title: 'Upload failed',
@@ -130,7 +130,10 @@ export default function RecordingPage() {
           )}
 
           {step === 'recording' && (
-            <VoiceRecorder onRecordingComplete={handleRecordingComplete} />
+            <VoiceRecorder
+              onRecordingComplete={handleRecordingComplete}
+              language={selectedLanguage}
+            />
           )}
 
           {step === 'uploading' && (
