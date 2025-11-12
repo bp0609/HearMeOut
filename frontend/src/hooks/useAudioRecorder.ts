@@ -30,6 +30,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedDurationRef = useRef<number>(0);
+  const pauseStartTimeRef = useRef<number>(0);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -68,13 +69,33 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('[MediaRecorder] ondataavailable fired:', {
+          dataSize: event.data.size,
+          dataType: event.data.type,
+        });
+
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
+          console.log('[MediaRecorder] Chunk added. Total chunks:', chunksRef.current.length);
+        } else {
+          console.warn('[MediaRecorder] Received chunk with 0 bytes');
         }
       };
 
       mediaRecorder.onstop = () => {
+        console.log('[MediaRecorder] Stop event fired');
+        console.log('[MediaRecorder] Total chunks collected:', chunksRef.current.length);
+
+        const totalSize = chunksRef.current.reduce((acc, chunk) => acc + chunk.size, 0);
+        console.log('[MediaRecorder] Total audio size:', totalSize, 'bytes');
+
         const blob = new Blob(chunksRef.current, { type: mimeType });
+        console.log('[MediaRecorder] Final blob created:', {
+          size: blob.size,
+          type: blob.type,
+          mimeType: mimeType,
+        });
+
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
 
@@ -92,7 +113,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start(100); // Collect data every 100ms
+
+      // Start recording without timeslice - ondataavailable fires only on stop()
+      // This ensures all audio data is collected in one chunk
+      console.log('[MediaRecorder] Starting recording with mimeType:', mimeType);
+      mediaRecorder.start();
 
       setIsRecording(true);
       setIsPaused(false);
@@ -145,7 +170,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         timerRef.current = null;
       }
 
-      pausedDurationRef.current += Date.now() - startTimeRef.current;
+      // Store when pause started (don't modify pausedDuration yet)
+      pauseStartTimeRef.current = Date.now();
     }
   }, [isRecording, isPaused]);
 
@@ -154,9 +180,13 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
 
-      startTimeRef.current = Date.now();
+      // Add time spent paused to total paused duration
+      if (pauseStartTimeRef.current > 0) {
+        pausedDurationRef.current += Date.now() - pauseStartTimeRef.current;
+        pauseStartTimeRef.current = 0;
+      }
 
-      // Resume timer
+      // Resume timer (startTimeRef stays the same - original start time!)
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000);
         setDuration(elapsed);
@@ -187,6 +217,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     chunksRef.current = [];
     startTimeRef.current = 0;
     pausedDurationRef.current = 0;
+    pauseStartTimeRef.current = 0;
   }, [audioUrl]);
 
   return {

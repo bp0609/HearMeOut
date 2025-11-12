@@ -33,6 +33,14 @@ router.post(
     const userId = req.auth!.userId;
     const file = req.file;
 
+    // Debug logging for upload request
+    console.log('[Upload] Request received:', {
+      hasAuth: !!req.headers.authorization,
+      contentType: req.headers['content-type'],
+      hasFile: !!file,
+      userId: userId,
+    });
+
     if (!file) {
       throw new AppError(400, 'Audio file is required');
     }

@@ -31,8 +31,10 @@ export function parseDate(dateString: string): Date {
  * Format duration in seconds to MM:SS
  */
 export function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
+  // Guard against negative values (edge case protection)
+  const safeSeconds = Math.max(0, seconds);
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = Math.floor(safeSeconds % 60);
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
@@ -108,7 +110,22 @@ export function downloadBlob(blob: Blob, filename: string): void {
  * Convert audio blob to File object
  */
 export function blobToFile(blob: Blob, filename: string): File {
-  return new File([blob], filename, { type: blob.type });
+  console.log('[blobToFile] Input:', {
+    blobSize: blob.size,
+    blobType: blob.type,
+    filename,
+  });
+
+  const file = new File([blob], filename, { type: blob.type });
+
+  console.log('[blobToFile] Output:', {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    lastModified: file.lastModified,
+  });
+
+  return file;
 }
 
 /**

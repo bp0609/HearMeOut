@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { CLERK_PUBLISHABLE_KEY } from './lib/constants';
+import { useAuth } from './hooks/useAuth';
 import HomePage from './pages/HomePage';
 import RecordingPage from './pages/RecordingPage';
 import StickerSelectionPage from './pages/StickerSelectionPage';
@@ -12,11 +13,18 @@ if (!CLERK_PUBLISHABLE_KEY) {
   throw new Error('Missing Clerk Publishable Key');
 }
 
+// Component to initialize auth globally for all authenticated routes
+function AuthProvider() {
+  useAuth(); // Sets up token getter for API client
+  return null;
+}
+
 function App() {
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       <BrowserRouter>
         <SignedIn>
+          <AuthProvider />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/record" element={<RecordingPage />} />

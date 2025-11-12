@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { formatDuration } from '@/lib/utils';
 import { RECORDING_CONFIG } from '@/lib/constants';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
@@ -28,11 +28,19 @@ export function VoiceRecorder({ onRecordingComplete, transcription }: VoiceRecor
   const remainingTime = RECORDING_CONFIG.maxDuration - duration;
   const canStop = duration >= RECORDING_CONFIG.minDuration;
 
+  // Use ref to prevent stale closure issues with callback
+  const onRecordingCompleteRef = useRef(onRecordingComplete);
+
+  useEffect(() => {
+    onRecordingCompleteRef.current = onRecordingComplete;
+  }, [onRecordingComplete]);
+
   useEffect(() => {
     if (audioBlob && !isRecording) {
-      onRecordingComplete(audioBlob, duration);
+      console.log('[VoiceRecorder] Triggering recording complete callback');
+      onRecordingCompleteRef.current(audioBlob, duration);
     }
-  }, [audioBlob, isRecording, duration, onRecordingComplete]);
+  }, [audioBlob, isRecording, duration]);
 
   return (
     <Card className="p-8">

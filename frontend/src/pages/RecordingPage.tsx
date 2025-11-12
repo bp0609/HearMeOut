@@ -21,6 +21,27 @@ export default function RecordingPage() {
   };
 
   const handleRecordingComplete = async (audioBlob: Blob, duration: number) => {
+    console.log('[Recording] Recording complete callback fired:', {
+      hasBob: !!audioBlob,
+      blobSize: audioBlob?.size,
+      blobType: audioBlob?.type,
+      duration,
+    });
+
+    // Validate blob before proceeding
+    if (!audioBlob || audioBlob.size === 0) {
+      console.error('[Recording] Invalid audio blob - cannot upload');
+
+      toast({
+        title: 'Recording failed',
+        description: 'No audio data was captured. Please try recording again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    console.log('[Recording] Valid audio blob detected, proceeding to upload');
+
     setStep('uploading');
     setIsUploading(true);
 
@@ -28,7 +49,24 @@ export default function RecordingPage() {
       // Convert blob to file
       const audioFile = blobToFile(audioBlob, `mood-${Date.now()}.webm`);
 
+      // Validate file after conversion
+      if (!audioFile || audioFile.size === 0) {
+        console.error('[Recording] File conversion failed');
+        throw new Error('Failed to create audio file');
+      }
+
+      console.log('[Recording] File created successfully:', {
+        fileName: audioFile.name,
+        fileSize: audioFile.size,
+        fileType: audioFile.type,
+      });
+
       // Upload to backend
+      console.log('[Recording] Uploading to backend...', {
+        language: selectedLanguage,
+        duration,
+      });
+
       const result = await api.createMoodEntry(audioFile, selectedLanguage, duration);
 
       toast({
@@ -38,12 +76,19 @@ export default function RecordingPage() {
 
       // Navigate to sticker selection
       navigate(`/select-sticker/${result.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('Error headers:', error.response?.headers);
+
+      const errorMessage = error.response?.data?.error ||
+                          error.response?.data?.details ||
+                          'Failed to process your recording. Please try again.';
 
       toast({
         title: 'Upload failed',
-        description: 'Failed to process your recording. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
 
