@@ -1,17 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 import { UserButton } from '@clerk/clerk-react';
-import { Calendar, TrendingUp, Settings, Mic } from 'lucide-react';
+import { Calendar, TrendingUp, Settings, Mic, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoodCalendar } from '@/components/Calendar/MoodCalendar';
-import { formatDate } from '@/lib/utils';
+import { getTodayIST } from '@/lib/utils';
 import { useMoodEntryByDate } from '@/hooks/useMoodData';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, isLoaded } = useAuth();
-  const today = formatDate(new Date());
-  const { entry, loading: entryLoading } = useMoodEntryByDate(today);
+  const today = getTodayIST(); // Use IST timezone for current date
+  const { entry } = useMoodEntryByDate(today);
 
   // Wait for auth to load before showing content
   if (!isLoaded) {
@@ -120,6 +120,14 @@ export default function HomePage() {
                 >
                   <TrendingUp className="mr-2 h-4 w-4" />
                   Check Your Progress
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => navigate('/data-history')}
+                >
+                  <Database className="mr-2 h-4 w-4" />
+                  View Data History
                 </Button>
                 <Button
                   variant="outline"

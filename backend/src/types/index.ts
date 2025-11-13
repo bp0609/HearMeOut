@@ -30,23 +30,13 @@ export interface EmotionScore {
   score: number;
 }
 
-export interface AudioFeatures {
-  mfcc_mean: number[];
-  mfcc_std: number[];
-  pitch_mean: number;
-  pitch_std: number;
-  energy_mean: number;
-  energy_std: number;
-  spectral_centroid: number;
-  spectral_rolloff: number;
-}
-
 export interface MLAnalysisResponse {
   success: boolean;
-  transcription: string;
-  emotionScores: EmotionScore[];
-  suggestedEmojis: string[];
-  audioFeatures: AudioFeatures;
+  audio_path?: string;
+  predicted_emotion?: string;
+  confidence?: number;
+  all_scores?: Record<string, number>;
+  top_emotions?: EmotionScore[];
   error?: string;
 }
 

@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
+import { getTodayIST } from '@/lib/utils';
 import { CHART_COLORS } from '@/lib/constants';
 import type { ProgressSummary } from '@/types';
 
@@ -15,6 +16,27 @@ export default function ProgressPage() {
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
+  const [hasTodayEntry, setHasTodayEntry] = useState(false);
+  const [checkingToday, setCheckingToday] = useState(true);
+
+  // Check if user has checked in today
+  useEffect(() => {
+    async function checkTodayEntry() {
+      try {
+        const today = getTodayIST();
+        const entry = await api.getMoodEntryByDate(today);
+        // Entry exists and has a selected emoji = checked in
+        setHasTodayEntry(entry !== null && entry.selectedEmoji !== null);
+      } catch (error) {
+        console.error('Error checking today entry:', error);
+        setHasTodayEntry(false);
+      } finally {
+        setCheckingToday(false);
+      }
+    }
+
+    checkTodayEntry();
+  }, []);
 
   useEffect(() => {
     async function fetchSummary() {
@@ -80,9 +102,11 @@ export default function ProgressPage() {
               <p className="text-muted-foreground mb-4">
                 Complete at least 10 check-ins to see your progress
               </p>
-              <Button onClick={() => navigate('/record')}>
-                Start Today's Check-in
-              </Button>
+              {!checkingToday && !hasTodayEntry && (
+                <Button onClick={() => navigate('/record')}>
+                  Start Today's Check-in
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

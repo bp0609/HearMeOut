@@ -2,16 +2,18 @@ import { Mic, Square, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { formatDuration } from '@/lib/utils';
 import { RECORDING_CONFIG } from '@/lib/constants';
 import { useEffect, useRef } from 'react';
+import type { Language } from '@/types';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
-  transcription?: string;
+  language?: Language;
 }
 
-export function VoiceRecorder({ onRecordingComplete, transcription }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRecorderProps) {
   const {
     isRecording,
     isPaused,
@@ -24,6 +26,33 @@ export function VoiceRecorder({ onRecordingComplete, transcription }: VoiceRecor
     error,
   } = useAudioRecorder();
 
+  // Map language code to speech recognition language
+  const getRecognitionLanguage = (lang: Language): string => {
+    const languageMap: Record<Language, string> = {
+      en: 'en-US',
+      hi: 'hi-IN',
+      gu: 'gu-IN',
+    };
+    return languageMap[lang] || 'en-US';
+  };
+
+  const {
+    transcript,
+    interimTranscript,
+    isSupported: isSpeechSupported,
+    startListening,
+    stopListening,
+    resetTranscript,
+    error: speechError,
+  } = useSpeechRecognition({
+    language: getRecognitionLanguage(language),
+    continuous: true,
+    interimResults: true,
+  });
+
+  // Combined transcript for display
+  const fullTranscript = transcript + (interimTranscript ? ' ' + interimTranscript : '');
+
   const progress = (duration / RECORDING_CONFIG.maxDuration) * 100;
   const remainingTime = RECORDING_CONFIG.maxDuration - duration;
   const canStop = duration >= RECORDING_CONFIG.minDuration;
@@ -34,6 +63,22 @@ export function VoiceRecorder({ onRecordingComplete, transcription }: VoiceRecor
   useEffect(() => {
     onRecordingCompleteRef.current = onRecordingComplete;
   }, [onRecordingComplete]);
+
+  // Sync speech recognition with recording state
+  useEffect(() => {
+    if (isRecording && !isPaused) {
+      startListening();
+    } else if (isPaused || !isRecording) {
+      stopListening();
+    }
+  }, [isRecording, isPaused, startListening, stopListening]);
+
+  // Reset transcript when starting new recording
+  useEffect(() => {
+    if (isRecording && duration === 0) {
+      resetTranscript();
+    }
+  }, [isRecording, duration, resetTranscript]);
 
   useEffect(() => {
     if (audioBlob && !isRecording) {
@@ -110,10 +155,31 @@ export function VoiceRecorder({ onRecordingComplete, transcription }: VoiceRecor
         )}
 
         {/* Transcription Preview */}
-        {transcription && (
-          <div className="bg-muted/50 rounded-lg p-4">
+        {isSpeechSupported && isRecording && fullTranscript && (
+          <div className="bg-muted/50 rounded-lg p-4 max-h-32 overflow-y-auto">
             <p className="text-xs text-muted-foreground mb-1">Live Transcription:</p>
-            <p className="text-sm">{transcription}</p>
+            <p className="text-sm">
+              {transcript}
+              {interimTranscript && (
+                <span className="text-muted-foreground italic"> {interimTranscript}</span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Speech Recognition Not Supported Warning */}
+        {!isSpeechSupported && isRecording && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-xs text-yellow-800">
+              Live transcription is not supported in this browser. Recording will still work normally.
+            </p>
+          </div>
+        )}
+
+        {/* Speech Recognition Error */}
+        {speechError && isRecording && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-xs text-yellow-800">{speechError}</p>
           </div>
         )}
 

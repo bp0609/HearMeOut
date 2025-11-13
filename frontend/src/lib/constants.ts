@@ -44,7 +44,7 @@ export const LANGUAGES = [
 
 // Recording constraints
 export const RECORDING_CONFIG = {
-  minDuration: 30, // seconds
+  minDuration: 5, // seconds
   maxDuration: 60, // seconds
   sampleRate: 16000,
   mimeType: 'audio/webm;codecs=opus',

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useCalendarData } from '@/hooks/useMoodData';
 import { useAuth } from '@/hooks/useAuth';
-import { getDaysInMonth, getFirstDayOfMonth, formatDate, isToday } from '@/lib/utils';
+import { getDaysInMonth, getFirstDayOfMonth, formatDate, isTodayIST } from '@/lib/utils';
 import { DAYS_OF_WEEK, MONTHS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -108,8 +108,9 @@ export function MoodCalendar() {
             }
 
             const date = new Date(year, month, day);
+            const dateString = formatDate(date);
             const emoji = getEmojiForDate(day);
-            const isTodayDate = isToday(date);
+            const isTodayDate = isTodayIST(dateString); // Use IST-aware date checking
 
             return (
               <div

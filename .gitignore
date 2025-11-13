@@ -161,9 +161,7 @@ Thumbs.db
 
 # Temp audio files
 temp_audio/
-*.wav
-*.webm
-*.mp3
+
 
 # Database
 *.db
@@ -171,3 +169,7 @@ temp_audio/
 
 # ML Model cache
 model_cache/
+
+**/.venv
+
+ml-service/wav2vec2-lg-xlsr-en-speech-emotion-recognition/*
