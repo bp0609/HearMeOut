@@ -182,6 +182,7 @@ router.get(
       },
       select: {
         entryDate: true,
+        dayOfWeek: true,
         selectedEmoji: true,
       },
       orderBy: {
@@ -192,6 +193,7 @@ router.get(
     // Convert to calendar format
     const calendarData = entries.map(entry => ({
       date: formatDateToString(entry.entryDate),
+      dayOfWeek: entry.dayOfWeek,
       emoji: entry.selectedEmoji,
     }));
 

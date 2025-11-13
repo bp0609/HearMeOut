@@ -8,7 +8,7 @@ import { analyzeAudio } from '../services/mlService';
 import { checkForPatterns } from '../services/patternDetection';
 import { audioUpload, deleteAudioFile } from '../middleware/fileUpload';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { getTodayIST, parseDateString, formatDateToString, getCurrentISTString } from '../utils/dateUtils';
+import { getTodayIST, parseDateString, formatDateToString, getCurrentISTString, getDayOfWeek } from '../utils/dateUtils';
 
 const router = Router();
 
@@ -78,6 +78,14 @@ router.post(
       // Get the user's database ID from Clerk ID
       const userId = await getUserIdFromClerk(clerkId);
 
+      // Get user settings to check audio storage preference
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { settings: true },
+      });
+
+      const shouldStoreAudio = user?.settings?.audioStorageEnabled ?? false;
+
       // Validate request body
       const body = createMoodSchema.parse({
         language: req.body.language,
@@ -112,7 +120,7 @@ router.post(
 
       // Format emotion scores: all 8 emotions with their scores
       const emotionScores = mlResult.all_scores || {};
-      
+
       // Get all 8 emojis with their confidence scores
       const emojisWithScores = Object.entries(emotionScores)
         .map(([emotion, score]) => ({
@@ -127,6 +135,7 @@ router.post(
         data: {
           userId,
           entryDate: todayIST,
+          dayOfWeek: getDayOfWeek(todayIST),
           audioFilePath: audioFilePath,
           duration: body.duration,
           language: body.language,
@@ -134,7 +143,13 @@ router.post(
         },
       });
 
-      console.log(`Mood entry created for user ${userId}, audio file stored at: ${audioFilePath}`);
+      // If user hasn't enabled audio storage, delete the file after ML analysis
+      if (!shouldStoreAudio) {
+        console.log(`[Audio Storage] User ${userId} has not enabled audio storage, deleting file after analysis...`);
+        deleteAudioFile(file.path);
+      } else {
+        console.log(`[Audio Storage] User ${userId} has enabled audio storage, file stored at: ${audioFilePath}`);
+      }
 
       res.status(201).json({
         success: true,
@@ -227,6 +242,7 @@ router.get(
       select: {
         id: true,
         entryDate: true,
+        dayOfWeek: true,
         selectedEmoji: true,
         createdAt: true,
       },
@@ -272,6 +288,7 @@ router.get(
       select: {
         id: true,
         entryDate: true,
+        dayOfWeek: true,
         selectedEmoji: true,
         createdAt: true,
       },

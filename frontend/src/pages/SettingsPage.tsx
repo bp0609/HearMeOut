@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Settings as SettingsIcon, Save } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, Save, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
-import { LANGUAGES } from '@/lib/constants';
-import type { UserSettings, Language } from '@/types';
+import type { UserSettings } from '@/types';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [originalSettings, setOriginalSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -21,6 +21,7 @@ export default function SettingsPage() {
       try {
         const data = await api.getSettings();
         setSettings(data);
+        setOriginalSettings(data); // Store original settings
       } catch (error) {
         console.error('Error fetching settings:', error);
         toast({
@@ -37,16 +38,48 @@ export default function SettingsPage() {
   }, [toast]);
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || !originalSettings) return;
+
+    // Check if audio storage is being disabled
+    const isDisablingAudioStorage =
+      originalSettings.audioStorageEnabled === true &&
+      settings.audioStorageEnabled === false;
+
+    if (isDisablingAudioStorage) {
+      const confirmed = window.confirm(
+        'Disabling audio storage will permanently delete all your stored voice recordings. ' +
+        'This action cannot be undone. Do you want to continue?'
+      );
+
+      if (!confirmed) {
+        return; // User cancelled
+      }
+    }
 
     setSaving(true);
 
     try {
-      await api.updateSettings(settings);
+      // Only send fields that can be updated (exclude read-only fields)
+      const updateData: Partial<UserSettings> = {
+        reminderEnabled: settings.reminderEnabled,
+        interventionThreshold: settings.interventionThreshold,
+        audioStorageEnabled: settings.audioStorageEnabled,
+      };
+
+      // Only include reminderTime if it's not null
+      if (settings.reminderTime !== null) {
+        updateData.reminderTime = settings.reminderTime;
+      }
+
+      const updatedSettings = await api.updateSettings(updateData);
+      setSettings(updatedSettings);
+      setOriginalSettings(updatedSettings); // Update original settings
 
       toast({
         title: 'Settings saved',
-        description: 'Your preferences have been updated',
+        description: isDisablingAudioStorage
+          ? 'Your audio recordings have been deleted.'
+          : 'Your preferences have been updated',
       });
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -107,34 +140,6 @@ export default function SettingsPage() {
 
         {/* Settings Cards */}
         <div className="space-y-6">
-          {/* Language */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferred Language</CardTitle>
-              <CardDescription>
-                Language for voice transcription
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => updateSetting('preferredLanguage', lang.code as Language)}
-                    className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                      settings.preferredLanguage === lang.code
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <span className="text-2xl">{lang.flag}</span>
-                    <span className="font-medium">{lang.label}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Reminders */}
           <Card>
             <CardHeader>
@@ -217,20 +222,29 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={settings.cloudStorageEnabled}
-                    onChange={(e) => updateSetting('cloudStorageEnabled', e.target.checked)}
-                    className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={settings.audioStorageEnabled}
+                    onChange={(e) => updateSetting('audioStorageEnabled', e.target.checked)}
+                    className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary mt-0.5"
                   />
-                  <div>
-                    <div className="font-medium">Enable cloud storage</div>
+                  <div className="flex-1">
+                    <div className="font-medium">Store voice recordings</div>
                     <p className="text-sm text-muted-foreground">
-                      Store transcriptions and metadata in the cloud (audio is never saved)
+                      Keep your voice recordings for future reference. You can view and delete them anytime from the Data History page.
                     </p>
                   </div>
                 </label>
+
+                {originalSettings && originalSettings.audioStorageEnabled && !settings.audioStorageEnabled && (
+                  <div className="flex gap-3 items-start bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Warning:</strong> Disabling this will permanently delete all previously stored recordings when you save settings.
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

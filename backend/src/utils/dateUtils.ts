@@ -17,18 +17,18 @@ const IST_OFFSET_MINUTES = 330;
  */
 export function getTodayIST(): Date {
   const now = new Date();
-  
+
   // Get current UTC time in milliseconds
   const utcTime = now.getTime();
-  
+
   // Add IST offset to get IST time
   const istTime = new Date(utcTime + IST_OFFSET_MINUTES * 60 * 1000);
-  
+
   // Extract date components in IST
   const year = istTime.getUTCFullYear();
   const month = istTime.getUTCMonth();
   const day = istTime.getUTCDate();
-  
+
   // Return midnight UTC representing this IST date
   return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 }
@@ -45,27 +45,27 @@ export function parseDateString(dateString: string): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     throw new Error(`Invalid date format: ${dateString}. Expected YYYY-MM-DD`);
   }
-  
+
   const [year, month, day] = dateString.split('-').map(Number);
-  
+
   // Validate ranges
   if (month < 1 || month > 12) {
     throw new Error(`Invalid month: ${month}. Must be between 1 and 12`);
   }
-  
+
   if (day < 1 || day > 31) {
     throw new Error(`Invalid day: ${day}. Must be between 1 and 31`);
   }
-  
+
   const date = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-  
+
   // Check if date is valid (handles invalid dates like Feb 30)
-  if (date.getUTCFullYear() !== year || 
-      date.getUTCMonth() !== month - 1 || 
-      date.getUTCDate() !== day) {
+  if (date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day) {
     throw new Error(`Invalid date: ${dateString}`);
   }
-  
+
   return date;
 }
 
@@ -191,13 +191,23 @@ export function validateNotFuture(dateString: string): void {
 export function validateReasonableRange(dateString: string): void {
   const date = parseDateString(dateString);
   const oneYearAgo = getDaysAgoIST(365);
-  
+
   if (isFuture(date)) {
     throw new Error(`Date ${dateString} is in the future. Cannot create entries for future dates.`);
   }
-  
+
   if (date.getTime() < oneYearAgo.getTime()) {
     throw new Error(`Date ${dateString} is more than 1 year in the past.`);
   }
 }
 
+/**
+ * Get day of week from a date
+ * 
+ * @param date - Date object
+ * @returns Day of week: Sun, Mon, Tue, Wed, Thu, Fri, Sat
+ */
+export function getDayOfWeek(date: Date): string {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return days[date.getUTCDay()];
+}

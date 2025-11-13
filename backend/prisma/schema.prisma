@@ -13,6 +13,7 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   clerkId   String   @unique
+  email     String?  @unique // Optional email for visibility, fetched from Clerk
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -21,6 +22,7 @@ model User {
   settings    UserSettings?
 
   @@index([clerkId])
+  @@index([email])
 }
 
 // Mood Entry - one per day per user
@@ -28,6 +30,7 @@ model MoodEntry {
   id              String   @id @default(uuid())
   userId          String
   entryDate       DateTime @db.Date
+  dayOfWeek       String?  // Day of week: Sun, Mon, Tue, Wed, Thu, Fri, Sat
 
   // Audio metadata
   audioFilePath   String   // Relative path to stored audio file
@@ -71,6 +74,11 @@ model UserSettings {
   interventionThreshold Int      @default(5) // Days of low mood before alert
   cloudStorageEnabled   Boolean  @default(false)
   preferredLanguage     String   @default("en")
+  
+  // Audio storage consent - null means not asked yet, true/false means user decision
+  audioStorageConsent   Boolean? // null = not asked, true = agreed, false = denied
+  consentGivenAt        DateTime? // When the user made their consent decision
+  audioStorageEnabled   Boolean  @default(false) // Current audio storage setting
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

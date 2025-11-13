@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/errorHandler';
 import moodRoutes from './routes/mood.routes';
 import progressRoutes from './routes/progress.routes';
 import settingsRoutes from './routes/settings.routes';
+import audioRoutes from './routes/audio.routes';
 import { checkMLServiceHealth } from './services/mlService';
 
 // Load environment variables
@@ -75,6 +76,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/moods', requireAuth, moodRoutes);
 app.use('/api/progress', requireAuth, progressRoutes);
 app.use('/api/settings', requireAuth, settingsRoutes);
+app.use('/api/audio', requireAuth, audioRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

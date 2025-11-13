@@ -45,13 +45,25 @@ export interface UserSettings {
   reminderEnabled: boolean;
   reminderTime: string | null;
   interventionThreshold: number;
-  cloudStorageEnabled: boolean;
-  preferredLanguage: 'en' | 'hi' | 'gu';
+  audioStorageConsent: boolean | null; // null = not asked, true = agreed, false = denied
+  audioStorageEnabled: boolean;
+  consentGivenAt: string | null;
 }
 
 export interface CalendarDay {
   date: string;
   emoji: string | null;
+}
+
+export interface AudioRecording {
+  id: string;
+  entryDate: string;
+  duration: number;
+  language: string;
+  selectedEmoji: string | null;
+  createdAt: string;
+  fileExists: boolean;
+  audioFilePath: string | null;
 }
 
 // UI State types

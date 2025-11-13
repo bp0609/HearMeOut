@@ -1,7 +1,7 @@
 // Clerk Authentication Middleware
 
 import { Request, Response, NextFunction } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth, clerkClient } from '@clerk/express';
 import { AuthenticatedRequest } from '../types';
 import { prisma } from '../services/prisma';
 
@@ -56,14 +56,26 @@ export async function requireAuth(
 
 /**
  * Ensures user exists in database, creates if not
+ * Fetches email from Clerk if available
  */
 async function ensureUserExists(clerkId: string): Promise<void> {
   try {
+    // Fetch user details from Clerk to get email
+    let email: string | undefined;
+    try {
+      const clerkUser = await clerkClient.users.getUser(clerkId);
+      email = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress;
+    } catch (clerkError) {
+      console.warn('[Auth] Could not fetch email from Clerk:', clerkError);
+      // Continue without email - it's optional
+    }
+
     await prisma.user.upsert({
       where: { clerkId },
-      update: {},
+      update: email ? { email } : {}, // Update email if we got it
       create: {
         clerkId,
+        email,
         settings: {
           create: {}, // Create default settings
         },
