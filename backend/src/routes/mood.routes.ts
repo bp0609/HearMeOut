@@ -2,6 +2,7 @@
 
 import { Router, Response, Request } from 'express';
 import { z } from 'zod';
+import path from 'path';
 import { prisma } from '../services/prisma';
 import { analyzeAudio } from '../services/mlService';
 import { checkForPatterns } from '../services/patternDetection';
@@ -11,27 +12,17 @@ import { getTodayIST, parseDateString, formatDateToString, getCurrentISTString }
 
 const router = Router();
 
-// Emotion to emoji mapping
-const EMOTION_TO_EMOJIS: Record<string, string[]> = {
-  angry: ['😠', '😡', '😤'],
-  calm: ['😌', '😇', '🙂'],
-  disgust: ['😒', '🙄', '😑'],
-  fearful: ['😰', '😨', '😱'],
-  happy: ['😊', '😄', '🥰'],
-  neutral: ['😐', '😶', '🤔'],
-  sad: ['😢', '😔', '😞'],
-  surprised: ['😮', '😯', '😲'],
+// Emotion to emoji mapping (8 emotions from the model)
+const EMOTION_TO_EMOJI: Record<string, string> = {
+  angry: '😠',
+  calm: '😌',
+  disgust: '😒',
+  fearful: '😰',
+  happy: '😊',
+  neutral: '😐',
+  sad: '😢',
+  surprised: '😮',
 };
-
-// Helper function to get emojis for top emotions
-function getEmojisFromEmotions(topEmotions: Array<{ emotion: string; score: number }>): string[] {
-  const emojis: string[] = [];
-  for (const { emotion } of topEmotions) {
-    const emotionEmojis = EMOTION_TO_EMOJIS[emotion.toLowerCase()] || [];
-    emojis.push(...emotionEmojis.slice(0, 1)); // Take first emoji from each emotion
-  }
-  return emojis.slice(0, 5); // Return max 5 emojis
-}
 
 // Helper function to get database user ID from Clerk ID
 async function getUserIdFromClerk(clerkId: string): Promise<string> {
@@ -55,8 +46,6 @@ const createMoodSchema = z.object({
 
 const updateMoodSchema = z.object({
   selectedEmoji: z.string(),
-  activityTags: z.array(z.string()).optional(),
-  userNotes: z.string().optional(),
 });
 
 /**
@@ -114,51 +103,49 @@ router.post(
         throw new AppError(409, 'Mood entry for today already exists');
       }
 
+      // Store audio file path (relative to process.cwd())
+      const audioFilePath = path.relative(process.cwd(), file.path);
+
       // Call ML service for analysis
       console.log(`Analyzing audio for user ${userId}...`);
       const mlResult = await analyzeAudio(file.path);
 
-      // Get suggested emojis from top emotions
-      const suggestedEmojis = getEmojisFromEmotions(mlResult.top_emotions || []);
+      // Format emotion scores: all 8 emotions with their scores
+      const emotionScores = mlResult.all_scores || {};
+      
+      // Get all 8 emojis with their confidence scores
+      const emojisWithScores = Object.entries(emotionScores)
+        .map(([emotion, score]) => ({
+          emoji: EMOTION_TO_EMOJI[emotion] || '😐',
+          emotion,
+          confidence: Math.round((score as number) * 100),
+        }))
+        .sort((a, b) => b.confidence - a.confidence); // Sort by confidence descending
 
-      // Create mood entry in database
+      // Create mood entry in database (without selectedEmoji - user will select later)
       const moodEntry = await prisma.moodEntry.create({
         data: {
           userId,
           entryDate: todayIST,
+          audioFilePath: audioFilePath,
           duration: body.duration,
           language: body.language,
-          transcription: null, // We're not doing transcription anymore, just emotion detection
-          audioFeatures: mlResult.all_scores as any, // Store all emotion scores
-          emotionScores: mlResult.top_emotions as any,
-          suggestedEmojis: suggestedEmojis,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              clerkId: true,
-            },
-          },
+          selectedEmoji: null, // Will be set when user selects
         },
       });
 
-      console.log(`Mood entry created for user ${userId}, audio file deleted`);
+      console.log(`Mood entry created for user ${userId}, audio file stored at: ${audioFilePath}`);
 
       res.status(201).json({
         success: true,
         data: {
           id: moodEntry.id,
           entryDate: formatDateToString(moodEntry.entryDate),
-          predictedEmotion: mlResult.predicted_emotion,
-          confidence: mlResult.confidence,
-          transcription: moodEntry.transcription,
-          emotionScores: moodEntry.emotionScores,
-          suggestedEmojis: moodEntry.suggestedEmojis,
+          emotionScores: emojisWithScores, // All 8 emojis with confidence scores
         },
       });
     } catch (error) {
-      // Ensure file is deleted even if error occurs
+      // Delete file if error occurs during processing
       deleteAudioFile(file.path);
       throw error;
     }
@@ -181,7 +168,7 @@ router.patch(
     // Validate request body
     const body = updateMoodSchema.parse(req.body);
 
-    // Update mood entry
+    // Update mood entry with selected emoji
     const moodEntry = await prisma.moodEntry.update({
       where: {
         id,
@@ -189,8 +176,6 @@ router.patch(
       },
       data: {
         selectedEmoji: body.selectedEmoji,
-        activityTags: body.activityTags || [],
-        userNotes: body.userNotes,
       },
     });
 
@@ -202,7 +187,6 @@ router.patch(
       data: {
         id: moodEntry.id,
         selectedEmoji: moodEntry.selectedEmoji,
-        activityTags: moodEntry.activityTags,
       },
     });
   })
@@ -244,11 +228,6 @@ router.get(
         id: true,
         entryDate: true,
         selectedEmoji: true,
-        suggestedEmojis: true,
-        activityTags: true,
-        userNotes: true,
-        transcription: true,
-        emotionScores: true,
         createdAt: true,
       },
     });
@@ -294,11 +273,6 @@ router.get(
         id: true,
         entryDate: true,
         selectedEmoji: true,
-        suggestedEmojis: true,
-        activityTags: true,
-        userNotes: true,
-        transcription: true,
-        emotionScores: true,
         createdAt: true,
       },
     });
@@ -327,12 +301,29 @@ router.delete(
     const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
+    // Get the entry first to get the audio file path
+    const entry = await prisma.moodEntry.findUnique({
+      where: { id, userId },
+      select: { audioFilePath: true },
+    });
+
+    if (!entry) {
+      throw new AppError(404, 'Mood entry not found');
+    }
+
+    // Delete from database
     await prisma.moodEntry.delete({
       where: {
         id,
         userId, // Ensure user owns this entry
       },
     });
+
+    // Delete the audio file
+    const fullPath = path.join(process.cwd(), entry.audioFilePath);
+    deleteAudioFile(fullPath);
+
+    console.log(`Mood entry ${id} deleted, audio file removed: ${entry.audioFilePath}`);
 
     res.json({
       success: true,

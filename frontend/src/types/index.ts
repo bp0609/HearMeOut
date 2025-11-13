@@ -1,30 +1,22 @@
 // Type definitions for frontend
 
-export interface EmotionScore {
+export interface EmotionScoreWithEmoji {
+  emoji: string;
   emotion: string;
-  score: number;
+  confidence: number; // 0-100
 }
 
 export interface MoodEntry {
   id: string;
   entryDate: string;
   selectedEmoji: string | null;
-  suggestedEmojis: string[];
-  activityTags: string[];
-  userNotes: string | null;
-  transcription: string | null;
-  emotionScores: EmotionScore[];
   createdAt: string;
 }
 
 export interface MoodEntryCreate {
-  transcription: string | null;
-  emotionScores: EmotionScore[];
-  suggestedEmojis: string[];
-  predictedEmotion?: string;
-  confidence?: number;
   id: string;
   entryDate: string;
+  emotionScores: EmotionScoreWithEmoji[]; // All 8 emojis sorted by confidence
 }
 
 export interface MoodDistribution {

@@ -75,8 +75,10 @@ export default function RecordingPage() {
         description: 'Now select your mood emoji',
       });
 
-      // Navigate to sticker selection
-      navigate(`/select-sticker/${result.id}`);
+      // Navigate to sticker selection with emotion scores
+      navigate(`/select-sticker/${result.id}`, {
+        state: { emotionScores: result.emotionScores },
+      });
     } catch (error: any) {
       console.error('Upload error:', error);
       console.error('Error response:', error.response?.data);

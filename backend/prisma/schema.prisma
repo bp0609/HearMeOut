@@ -30,19 +30,12 @@ model MoodEntry {
   entryDate       DateTime @db.Date
 
   // Audio metadata
+  audioFilePath   String   // Relative path to stored audio file
   duration        Int      // Duration in seconds
   language        String   @default("en")
 
-  // ML Analysis results
-  transcription   String?  @db.Text
-  audioFeatures   Json     // Raw acoustic features (MFCCs, pitch, energy)
-  emotionScores   Json     // Emotion probabilities from ML model
-  suggestedEmojis String[] // Top 3 AI suggestions
-  selectedEmoji   String?  // User's final choice
-
-  // Additional context
-  activityTags    String[] // exercise, sleep, social, stress, etc.
-  userNotes       String?  @db.Text
+  // User's selected emoji (null until user selects)
+  selectedEmoji   String?  // User's final choice from 8 emotions
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
