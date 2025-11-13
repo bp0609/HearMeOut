@@ -18,19 +18,13 @@ const IST_OFFSET_MINUTES = 330;
 export function getTodayIST(): Date {
   const now = new Date();
 
-  // Get current UTC time in milliseconds
-  const utcTime = now.getTime();
-
-  // Add IST offset to get IST time
-  const istTime = new Date(utcTime + IST_OFFSET_MINUTES * 60 * 1000);
-
-  // Extract date components in IST
-  const year = istTime.getUTCFullYear();
-  const month = istTime.getUTCMonth();
-  const day = istTime.getUTCDate();
+  // Get current date in IST using toLocaleString with Asia/Kolkata timezone
+  const istString = now.toLocaleString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+  // istString will be in format 'YYYY-MM-DD'
+  const [year, month, day] = istString.split('-').map(Number);
 
   // Return midnight UTC representing this IST date
-  return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 }
 
 /**
