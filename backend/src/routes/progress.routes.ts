@@ -302,4 +302,217 @@ function getAlertSuggestions(alertType: string): string[] {
   return ['Take care of yourself', 'Reach out if you need support'];
 }
 
+/**
+ * GET /api/progress/weekday-distribution
+ * Get mood distribution by day of week
+ */
+router.get(
+  '/weekday-distribution',
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = await getUserIdFromClerk(req.auth.userId);
+    const { year, month } = req.query;
+
+    let entries;
+
+    if (year && month) {
+      // Filter by specific month
+      const y = parseInt(year as string);
+      const m = parseInt(month as string);
+      const firstDay = getMonthStartIST(y, m);
+      const lastDay = getMonthEndIST(y, m);
+
+      entries = await prisma.moodEntry.findMany({
+        where: {
+          userId,
+          selectedEmoji: { not: null },
+          entryDate: {
+            gte: firstDay,
+            lte: lastDay,
+          },
+        },
+        select: {
+          dayOfWeek: true,
+          selectedEmoji: true,
+        },
+      });
+    } else {
+      // Use all data
+      entries = await prisma.moodEntry.findMany({
+        where: {
+          userId,
+          selectedEmoji: { not: null },
+        },
+        select: {
+          dayOfWeek: true,
+          selectedEmoji: true,
+        },
+      });
+    }
+
+    // Group by day of week
+    const weekdayData: Record<string, Record<string, number>> = {
+      Sun: {},
+      Mon: {},
+      Tue: {},
+      Wed: {},
+      Thu: {},
+      Fri: {},
+      Sat: {},
+    };
+
+    entries.forEach(entry => {
+      if (entry.selectedEmoji && entry.dayOfWeek) {
+        if (!weekdayData[entry.dayOfWeek][entry.selectedEmoji]) {
+          weekdayData[entry.dayOfWeek][entry.selectedEmoji] = 0;
+        }
+        weekdayData[entry.dayOfWeek][entry.selectedEmoji]++;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: weekdayData,
+    });
+  })
+);
+
+/**
+ * GET /api/progress/mood-trend
+ * Get mood trend over time for line chart
+ */
+router.get(
+  '/mood-trend',
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = await getUserIdFromClerk(req.auth.userId);
+    const { year, month } = req.query;
+
+    let entries;
+
+    if (year && month) {
+      // Filter by specific month
+      const y = parseInt(year as string);
+      const m = parseInt(month as string);
+      const firstDay = getMonthStartIST(y, m);
+      const lastDay = getMonthEndIST(y, m);
+
+      entries = await prisma.moodEntry.findMany({
+        where: {
+          userId,
+          selectedEmoji: { not: null },
+          entryDate: {
+            gte: firstDay,
+            lte: lastDay,
+          },
+        },
+        select: {
+          entryDate: true,
+          selectedEmoji: true,
+        },
+        orderBy: {
+          entryDate: 'asc',
+        },
+      });
+    } else {
+      // Use all data
+      entries = await prisma.moodEntry.findMany({
+        where: {
+          userId,
+          selectedEmoji: { not: null },
+        },
+        select: {
+          entryDate: true,
+          selectedEmoji: true,
+        },
+        orderBy: {
+          entryDate: 'asc',
+        },
+      });
+    }
+
+    const trendData = entries.map(entry => ({
+      date: formatDateToString(entry.entryDate),
+      emoji: entry.selectedEmoji,
+    }));
+
+    res.json({
+      success: true,
+      data: trendData,
+    });
+  })
+);
+
+/**
+ * GET /api/progress/mood-counts
+ * Get total count for each mood emoji
+ */
+router.get(
+  '/mood-counts',
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.auth?.userId) {
+      throw new AppError(401, 'Unauthorized: Missing user authentication');
+    }
+    const userId = await getUserIdFromClerk(req.auth.userId);
+    const { year, month } = req.query;
+
+    let entries;
+
+    if (year && month) {
+      // Filter by specific month
+      const y = parseInt(year as string);
+      const m = parseInt(month as string);
+      const firstDay = getMonthStartIST(y, m);
+      const lastDay = getMonthEndIST(y, m);
+
+      entries = await prisma.moodEntry.findMany({
+        where: {
+          userId,
+          selectedEmoji: { not: null },
+          entryDate: {
+            gte: firstDay,
+            lte: lastDay,
+          },
+        },
+        select: {
+          selectedEmoji: true,
+        },
+      });
+    } else {
+      // Use all data
+      entries = await prisma.moodEntry.findMany({
+        where: {
+          userId,
+          selectedEmoji: { not: null },
+        },
+        select: {
+          selectedEmoji: true,
+        },
+      });
+    }
+
+    const moodCounts: Record<string, number> = {};
+    let totalEntries = 0;
+
+    entries.forEach(entry => {
+      if (entry.selectedEmoji) {
+        moodCounts[entry.selectedEmoji] = (moodCounts[entry.selectedEmoji] || 0) + 1;
+        totalEntries++;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        moodCounts,
+        totalEntries,
+      },
+    });
+  })
+);
+
 export default router;
