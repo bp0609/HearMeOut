@@ -14,7 +14,6 @@ export default function RecordingPage() {
   const { toast } = useToast();
   const [step, setStep] = useState<'language' | 'recording' | 'uploading'>('language');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('en');
-  const [isUploading, setIsUploading] = useState(false);
 
   const handleLanguageContinue = () => {
     setStep('recording');
@@ -43,7 +42,6 @@ export default function RecordingPage() {
     console.log('[Recording] Valid audio blob detected, proceeding to upload');
 
     setStep('uploading');
-    setIsUploading(true);
 
     try {
       // Convert blob to file
@@ -74,8 +72,10 @@ export default function RecordingPage() {
         description: 'Now select your mood emoji',
       });
 
-      // Navigate to sticker selection
-      navigate(`/select-sticker/${result.id}`);
+      // Navigate to sticker selection with emotion scores
+      navigate(`/select-sticker/${result.id}`, {
+        state: { emotionScores: result.emotionScores },
+      });
     } catch (error: any) {
       console.error('Upload error:', error);
       console.error('Error response:', error.response?.data);
@@ -83,8 +83,8 @@ export default function RecordingPage() {
       console.error('Error headers:', error.response?.headers);
 
       const errorMessage = error.response?.data?.error ||
-                          error.response?.data?.details ||
-                          'Failed to process your recording. Please try again.';
+        error.response?.data?.details ||
+        'Failed to process your recording. Please try again.';
 
       toast({
         title: 'Upload failed',
@@ -93,7 +93,6 @@ export default function RecordingPage() {
       });
 
       setStep('recording');
-      setIsUploading(false);
     }
   };
 
@@ -130,7 +129,10 @@ export default function RecordingPage() {
           )}
 
           {step === 'recording' && (
-            <VoiceRecorder onRecordingComplete={handleRecordingComplete} />
+            <VoiceRecorder
+              onRecordingComplete={handleRecordingComplete}
+              language={selectedLanguage}
+            />
           )}
 
           {step === 'uploading' && (

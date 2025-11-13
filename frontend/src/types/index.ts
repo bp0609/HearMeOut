@@ -1,28 +1,22 @@
 // Type definitions for frontend
 
-export interface EmotionScore {
+export interface EmotionScoreWithEmoji {
+  emoji: string;
   emotion: string;
-  score: number;
+  confidence: number; // 0-100
 }
 
 export interface MoodEntry {
   id: string;
   entryDate: string;
   selectedEmoji: string | null;
-  suggestedEmojis: string[];
-  activityTags: string[];
-  userNotes: string | null;
-  transcription: string | null;
-  emotionScores: EmotionScore[];
   createdAt: string;
 }
 
 export interface MoodEntryCreate {
-  transcription: string;
-  emotionScores: EmotionScore[];
-  suggestedEmojis: string[];
   id: string;
   entryDate: string;
+  emotionScores: EmotionScoreWithEmoji[]; // All 8 emojis sorted by confidence
 }
 
 export interface MoodDistribution {
@@ -51,13 +45,25 @@ export interface UserSettings {
   reminderEnabled: boolean;
   reminderTime: string | null;
   interventionThreshold: number;
-  cloudStorageEnabled: boolean;
-  preferredLanguage: 'en' | 'hi' | 'gu';
+  audioStorageConsent: boolean | null; // null = not asked, true = agreed, false = denied
+  audioStorageEnabled: boolean;
+  consentGivenAt: string | null;
 }
 
 export interface CalendarDay {
   date: string;
   emoji: string | null;
+}
+
+export interface AudioRecording {
+  id: string;
+  entryDate: string;
+  duration: number;
+  language: string;
+  selectedEmoji: string | null;
+  createdAt: string;
+  fileExists: boolean;
+  audioFilePath: string | null;
 }
 
 // UI State types

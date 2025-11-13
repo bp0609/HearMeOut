@@ -30,12 +30,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - temp_audio:/app/temp_audio
-    environment:
-      - FLASK_ENV=development
-      - MODEL_CACHE_DIR=/app/model_cache
+      # Map to local backend temp_audio folder
+      - ./backend/temp_audio:/app/temp_audio
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,6 +43,4 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
-  temp_audio:
     driver: local

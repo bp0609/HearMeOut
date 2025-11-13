@@ -2,13 +2,41 @@
 
 import { Router, Response, Request } from 'express';
 import { z } from 'zod';
+import path from 'path';
 import { prisma } from '../services/prisma';
 import { analyzeAudio } from '../services/mlService';
 import { checkForPatterns } from '../services/patternDetection';
 import { audioUpload, deleteAudioFile } from '../middleware/fileUpload';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
+import { getTodayIST, parseDateString, formatDateToString, getCurrentISTString, getDayOfWeek } from '../utils/dateUtils';
 
 const router = Router();
+
+// Emotion to emoji mapping (8 emotions from the model)
+const EMOTION_TO_EMOJI: Record<string, string> = {
+  angry: '😠',
+  calm: '😌',
+  disgust: '😒',
+  fearful: '😰',
+  happy: '😊',
+  neutral: '😐',
+  sad: '😢',
+  surprised: '😮',
+};
+
+// Helper function to get database user ID from Clerk ID
+async function getUserIdFromClerk(clerkId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new AppError(404, 'User not found in database');
+  }
+
+  return user.id;
+}
 
 // Validation schemas
 const createMoodSchema = z.object({
@@ -18,8 +46,6 @@ const createMoodSchema = z.object({
 
 const updateMoodSchema = z.object({
   selectedEmoji: z.string(),
-  activityTags: z.array(z.string()).optional(),
-  userNotes: z.string().optional(),
 });
 
 /**
@@ -33,7 +59,7 @@ router.post(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const clerkId = req.auth.userId;
     const file = req.file;
 
     // Debug logging for upload request
@@ -41,7 +67,7 @@ router.post(
       hasAuth: !!req.headers.authorization,
       contentType: req.headers['content-type'],
       hasFile: !!file,
-      userId: userId,
+      clerkId: clerkId,
     });
 
     if (!file) {
@@ -49,22 +75,33 @@ router.post(
     }
 
     try {
+      // Get the user's database ID from Clerk ID
+      const userId = await getUserIdFromClerk(clerkId);
+
+      // Get user settings to check audio storage preference
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { settings: true },
+      });
+
+      const shouldStoreAudio = user?.settings?.audioStorageEnabled ?? false;
+
       // Validate request body
       const body = createMoodSchema.parse({
         language: req.body.language,
         duration: parseInt(req.body.duration),
       });
 
-      // Get today's date (midnight)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Get today's date in IST timezone
+      const todayIST = getTodayIST();
+      console.log(`[IST] Current IST time: ${getCurrentISTString()}, Today's date: ${formatDateToString(todayIST)}`);
 
       // Check if entry already exists for today
       const existingEntry = await prisma.moodEntry.findUnique({
         where: {
           userId_entryDate: {
             userId,
-            entryDate: today,
+            entryDate: todayIST,
           },
         },
       });
@@ -74,49 +111,56 @@ router.post(
         throw new AppError(409, 'Mood entry for today already exists');
       }
 
+      // Store audio file path (relative to process.cwd())
+      const audioFilePath = path.relative(process.cwd(), file.path);
+
       // Call ML service for analysis
       console.log(`Analyzing audio for user ${userId}...`);
-      const mlResult = await analyzeAudio(file.path, body.language);
+      const mlResult = await analyzeAudio(file.path);
 
-      // Create mood entry in database
+      // Format emotion scores: all 8 emotions with their scores
+      const emotionScores = mlResult.all_scores || {};
+
+      // Get all 8 emojis with their confidence scores
+      const emojisWithScores = Object.entries(emotionScores)
+        .map(([emotion, score]) => ({
+          emoji: EMOTION_TO_EMOJI[emotion] || '😐',
+          emotion,
+          confidence: Math.round((score as number) * 100),
+        }))
+        .sort((a, b) => b.confidence - a.confidence); // Sort by confidence descending
+
+      // Create mood entry in database (without selectedEmoji - user will select later)
       const moodEntry = await prisma.moodEntry.create({
         data: {
           userId,
-          entryDate: today,
+          entryDate: todayIST,
+          dayOfWeek: getDayOfWeek(todayIST),
+          audioFilePath: shouldStoreAudio ? audioFilePath : (null as any), // Only store path if storage is enabled
           duration: body.duration,
           language: body.language,
-          transcription: mlResult.transcription,
-          audioFeatures: mlResult.audioFeatures as any,
-          emotionScores: mlResult.emotionScores as any,
-          suggestedEmojis: mlResult.suggestedEmojis,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              clerkId: true,
-            },
-          },
+          selectedEmoji: null, // Will be set when user selects
         },
       });
 
-      // CRITICAL: Delete audio file immediately after processing
-      deleteAudioFile(file.path);
-
-      console.log(`Mood entry created for user ${userId}, audio file deleted`);
+      // If user hasn't enabled audio storage, delete the file after ML analysis
+      if (!shouldStoreAudio) {
+        console.log(`[Audio Storage] User ${userId} has not enabled audio storage, deleting file after analysis...`);
+        deleteAudioFile(file.path);
+      } else {
+        console.log(`[Audio Storage] User ${userId} has enabled audio storage, file stored at: ${audioFilePath}`);
+      }
 
       res.status(201).json({
         success: true,
         data: {
           id: moodEntry.id,
-          entryDate: moodEntry.entryDate.toISOString().split('T')[0],
-          transcription: moodEntry.transcription,
-          emotionScores: moodEntry.emotionScores,
-          suggestedEmojis: moodEntry.suggestedEmojis,
+          entryDate: formatDateToString(moodEntry.entryDate),
+          emotionScores: emojisWithScores, // All 8 emojis with confidence scores
         },
       });
     } catch (error) {
-      // Ensure file is deleted even if error occurs
+      // Delete file if error occurs during processing
       deleteAudioFile(file.path);
       throw error;
     }
@@ -133,13 +177,13 @@ router.patch(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
     // Validate request body
     const body = updateMoodSchema.parse(req.body);
 
-    // Update mood entry
+    // Update mood entry with selected emoji
     const moodEntry = await prisma.moodEntry.update({
       where: {
         id,
@@ -147,8 +191,6 @@ router.patch(
       },
       data: {
         selectedEmoji: body.selectedEmoji,
-        activityTags: body.activityTags || [],
-        userNotes: body.userNotes,
       },
     });
 
@@ -160,7 +202,6 @@ router.patch(
       data: {
         id: moodEntry.id,
         selectedEmoji: moodEntry.selectedEmoji,
-        activityTags: moodEntry.activityTags,
       },
     });
   })
@@ -176,7 +217,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { startDate, endDate, limit = '30' } = req.query;
 
     const where: any = { userId };
@@ -201,12 +242,8 @@ router.get(
       select: {
         id: true,
         entryDate: true,
+        dayOfWeek: true,
         selectedEmoji: true,
-        suggestedEmojis: true,
-        activityTags: true,
-        userNotes: true,
-        transcription: true,
-        emotionScores: true,
         createdAt: true,
       },
     });
@@ -215,7 +252,7 @@ router.get(
       success: true,
       data: entries.map(entry => ({
         ...entry,
-        entryDate: entry.entryDate.toISOString().split('T')[0],
+        entryDate: formatDateToString(entry.entryDate),
       })),
     });
   })
@@ -231,11 +268,16 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { date } = req.params;
 
-    const entryDate = new Date(date);
-    entryDate.setHours(0, 0, 0, 0);
+    // Parse and validate date string
+    let entryDate;
+    try {
+      entryDate = parseDateString(date);
+    } catch (err: any) {
+      throw new AppError(400, `Invalid date format: ${err.message}`);
+    }
 
     const entry = await prisma.moodEntry.findUnique({
       where: {
@@ -247,12 +289,8 @@ router.get(
       select: {
         id: true,
         entryDate: true,
+        dayOfWeek: true,
         selectedEmoji: true,
-        suggestedEmojis: true,
-        activityTags: true,
-        userNotes: true,
-        transcription: true,
-        emotionScores: true,
         createdAt: true,
       },
     });
@@ -262,7 +300,7 @@ router.get(
       success: true,
       data: entry ? {
         ...entry,
-        entryDate: entry.entryDate.toISOString().split('T')[0],
+        entryDate: formatDateToString(entry.entryDate),
       } : null,
     });
   })
@@ -278,15 +316,35 @@ router.delete(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
+    // Get the entry first to get the audio file path
+    const entry = await prisma.moodEntry.findUnique({
+      where: { id, userId },
+      select: { audioFilePath: true },
+    });
+
+    if (!entry) {
+      throw new AppError(404, 'Mood entry not found');
+    }
+
+    // Delete from database
     await prisma.moodEntry.delete({
       where: {
         id,
         userId, // Ensure user owns this entry
       },
     });
+
+    // Delete the audio file if it exists
+    if (entry.audioFilePath) {
+      const fullPath = path.join(process.cwd(), entry.audioFilePath);
+      deleteAudioFile(fullPath);
+      console.log(`Mood entry ${id} deleted, audio file removed: ${entry.audioFilePath}`);
+    } else {
+      console.log(`Mood entry ${id} deleted, no audio file to remove`);
+    }
 
     res.json({
       success: true,

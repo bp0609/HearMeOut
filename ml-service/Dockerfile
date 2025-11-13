@@ -16,25 +16,18 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download models at build time (optional, can be done at runtime)
-# This makes the image larger but speeds up first startup
-RUN python -c "import whisper; whisper.load_model('base')"
-
 # Copy application code
 COPY . .
 
-# Create directories
-RUN mkdir -p /app/temp_audio /app/model_cache
+# Create temp_audio directory for shared volume
+RUN mkdir -p /app/temp_audio
 
 # Expose port
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/ || exit 1
 
-# Run with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--preload", "app:app"]
-
-# For development, use:
-# CMD ["python", "app.py"]
+# Run the Flask app
+CMD ["python", "app.py"]

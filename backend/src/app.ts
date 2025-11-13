@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/errorHandler';
 import moodRoutes from './routes/mood.routes';
 import progressRoutes from './routes/progress.routes';
 import settingsRoutes from './routes/settings.routes';
+import audioRoutes from './routes/audio.routes';
 import { checkMLServiceHealth } from './services/mlService';
 
 // Load environment variables
@@ -16,9 +17,29 @@ config();
 
 const app = express();
 
+// CORS configuration - allow multiple origins for development
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://127.0.0.1:5173',
+  process.env.DEV_IP ? `https://${process.env.DEV_IP}:5173` : null,
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+].filter((origin, index, self) => origin && self.indexOf(origin) === index); // Remove duplicates and nulls
+
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
@@ -55,6 +76,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/moods', requireAuth, moodRoutes);
 app.use('/api/progress', requireAuth, progressRoutes);
 app.use('/api/settings', requireAuth, settingsRoutes);
+app.use('/api/audio', requireAuth, audioRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

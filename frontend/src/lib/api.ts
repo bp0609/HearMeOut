@@ -9,6 +9,7 @@ import {
   PatternAlert,
   UserSettings,
   CalendarDay,
+  AudioRecording,
 } from '../types';
 
 class ApiClient {
@@ -241,6 +242,31 @@ class ApiClient {
   async updateSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
     const response = await this.client.patch('/api/settings', settings);
     return response.data.data;
+  }
+
+  /**
+   * Set audio storage consent (first-time)
+   */
+  async setAudioConsent(consent: boolean): Promise<UserSettings> {
+    const response = await this.client.post('/api/settings/consent', { consent });
+    return response.data.data;
+  }
+
+  // Audio endpoints
+
+  /**
+   * Get all audio recordings
+   */
+  async getAudioRecordings(): Promise<AudioRecording[]> {
+    const response = await this.client.get('/api/audio/recordings');
+    return response.data.data.recordings;
+  }
+
+  /**
+   * Delete an audio recording
+   */
+  async deleteAudioRecording(entryId: string): Promise<void> {
+    await this.client.delete(`/api/audio/recordings/${entryId}`);
   }
 
   // Health check

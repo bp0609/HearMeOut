@@ -1,190 +1,325 @@
 """
-Flask ML Service for Daily Mood Journal
-Provides emotion detection and speech-to-text analysis from audio files
+Flask API for Speech Emotion Recognition
+This API accepts audio file paths and returns emotion predictions.
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import whisper
+import torch
+import torch.nn as nn
+import librosa
+import numpy as np
+from transformers import Wav2Vec2Model, Wav2Vec2PreTrainedModel, AutoFeatureExtractor, AutoConfig
+from transformers.modeling_outputs import SequenceClassifierOutput
+from safetensors.torch import load_file
 import os
-import traceback
-from pathlib import Path
+import logging
 
-import config
-from utils.audio_processor import load_audio, extract_audio_features
-from utils.emotion_detector import EmotionDetector
-from utils.emoji_mapper import emotions_to_emojis, get_emojis_by_category
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Global model instances (loaded once at startup)
-emotion_detector = None
-whisper_model = None
+# Define emotion labels
+EMOTIONS = ['angry', 'calm', 'disgust', 'fearful', 'happy', 'neutral', 'sad', 'surprised']
+MODEL_PATH = "./wav2vec2-lg-xlsr-en-speech-emotion-recognition"
+SAMPLING_RATE = 16000
 
-def initialize_models():
-    """Load ML models at startup"""
-    global emotion_detector, whisper_model
 
-    print("=" * 60)
-    print("Initializing ML Service...")
-    print("=" * 60)
+# Define custom model class
+class Wav2Vec2ClassificationHead(nn.Module):
+    """Head for wav2vec classification task."""
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dropout = nn.Dropout(config.final_dropout)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
 
-    try:
-        # Create model cache directory
-        os.makedirs(config.MODEL_CACHE_DIR, exist_ok=True)
+    def forward(self, features):
+        x = features
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
 
-        # Load emotion detection model
-        print("\n1. Loading emotion detection model...")
-        emotion_detector = EmotionDetector()
 
-        # Load Whisper model for speech-to-text
-        print(f"\n2. Loading Whisper model (size: {config.WHISPER_MODEL_SIZE})...")
-        whisper_model = whisper.load_model(
-            config.WHISPER_MODEL_SIZE,
-            download_root=config.MODEL_CACHE_DIR
+class Wav2Vec2ForSpeechClassification(Wav2Vec2PreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.pooling_mode = getattr(config, 'pooling_mode', 'mean')
+        self.config = config
+
+        self.wav2vec2 = Wav2Vec2Model(config)
+        self.classifier = Wav2Vec2ClassificationHead(config)
+
+        self.init_weights()
+
+    def freeze_feature_extractor(self):
+        self.wav2vec2.feature_extractor._freeze_parameters()
+
+    def merged_strategy(self, hidden_states, mode="mean"):
+        if mode == "mean":
+            outputs = torch.mean(hidden_states, dim=1)
+        elif mode == "sum":
+            outputs = torch.sum(hidden_states, dim=1)
+        elif mode == "max":
+            outputs = torch.max(hidden_states, dim=1)[0]
+        else:
+            raise Exception("The pooling method hasn't been defined! Your pooling mode must be one of these ['mean', 'sum', 'max']")
+        return outputs
+
+    def forward(self, input_values, attention_mask=None, output_attentions=None, 
+                output_hidden_states=None, return_dict=None, labels=None):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.wav2vec2(
+            input_values, 
+            attention_mask=attention_mask, 
+            output_attentions=output_attentions, 
+            output_hidden_states=output_hidden_states, 
+            return_dict=return_dict
         )
-        print("✓ Whisper model loaded successfully")
+        hidden_states = outputs[0]
+        hidden_states = self.merged_strategy(hidden_states, mode=self.pooling_mode)
+        logits = self.classifier(hidden_states)
 
-        print("\n" + "=" * 60)
-        print("✓ ML Service initialized successfully!")
-        print("=" * 60 + "\n")
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
-    except Exception as e:
-        print(f"\n✗ Error initializing models: {str(e)}")
-        traceback.print_exc()
-        raise
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else output
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
+        return SequenceClassifierOutput(
+            loss=loss, 
+            logits=logits, 
+            hidden_states=outputs.hidden_states, 
+            attentions=outputs.attentions
+        )
+
+
+# Global variables for model and feature extractor
+model = None
+feature_extractor = None
+device = None
+
+
+def load_model():
+    """Load the emotion recognition model and feature extractor."""
+    global model, feature_extractor, device
+    
+    logger.info("=" * 60)
+    logger.info("Loading emotion recognition model...")
+    logger.info("=" * 60)
+    
+    # Set device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"Using device: {device}")
+    
+    # Load config
+    config = AutoConfig.from_pretrained(MODEL_PATH)
+    
+    # Create the model
+    model = Wav2Vec2ForSpeechClassification(config)
+    
+    # Load the trained weights from safetensors
+    state_dict = load_file(f"{MODEL_PATH}/model.safetensors")
+    
+    # Map old classifier key names to new classifier key names
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        if key == "classifier.output.weight":
+            new_state_dict["classifier.out_proj.weight"] = value
+        elif key == "classifier.output.bias":
+            new_state_dict["classifier.out_proj.bias"] = value
+        else:
+            new_state_dict[key] = value
+    
+    # Load the mapped weights
+    model.load_state_dict(new_state_dict, strict=False)
+    
+    # Move model to device and set to evaluation mode
+    model = model.to(device)
+    model.eval()
+    
+    # Load feature extractor
+    feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_PATH)
+    
+    logger.info("✅ Model loaded successfully!")
+    logger.info("=" * 60)
+
+
+def predict_emotion(audio_path):
+    """
+    Predict emotion from an audio file
+    
+    Args:
+        audio_path: Path to the audio file
+    
+    Returns:
+        Dictionary with prediction results
+    """
+    # Load and preprocess audio
+    speech, sr = librosa.load(audio_path, sr=SAMPLING_RATE)
+    
+    # Extract features
+    inputs = feature_extractor(speech, sampling_rate=SAMPLING_RATE, return_tensors="pt", padding=True)
+    inputs = {key: val.to(device) for key, val in inputs.items()}
+    
+    # Make prediction
+    with torch.no_grad():
+        logits = model(**inputs).logits
+    
+    # Get probabilities
+    scores = torch.nn.functional.softmax(logits, dim=1).detach().cpu().numpy()[0]
+    
+    # Get predicted emotion
+    predicted_id = np.argmax(scores)
+    predicted_emotion = EMOTIONS[predicted_id]
+    confidence = float(scores[predicted_id])
+    
+    # Create results dictionary with all emotions sorted by score
+    all_scores = {emotion: float(score) for emotion, score in zip(EMOTIONS, scores)}
+    sorted_emotions = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
+    
+    results = {
+        'predicted_emotion': predicted_emotion,
+        'confidence': confidence,
+        'all_scores': all_scores,
+        'top_emotions': [{'emotion': emotion, 'score': score} for emotion, score in sorted_emotions[:3]]
+    }
+    
+    return results
+
+
+@app.route('/', methods=['GET'])
+def home():
+    """API home endpoint - health check."""
     return jsonify({
-        'status': 'ok',
-        'models_loaded': emotion_detector is not None and whisper_model is not None,
-        'version': '1.0.0'
+        'status': 'healthy',
+        'service': 'Speech Emotion Recognition API',
+        'version': '1.0.0',
+        'model_loaded': model is not None,
+        'device': str(device) if device is not None else 'not initialized',
+        'supported_emotions': EMOTIONS
     }), 200
 
-@app.route('/analyze', methods=['POST'])
-def analyze_audio():
+
+@app.route('/predict', methods=['POST'])
+def predict():
     """
-    Analyze audio file for emotion and transcription
-
-    Expected form data:
-    - audio: Audio file (WAV, MP3, WEBM, etc.)
-    - language: Language code (en, hi, gu) - optional
-
-    Returns:
-        JSON with emotion scores, emoji suggestions, transcription, and audio features
+    Predict emotion from audio file.
+    
+    Request body:
+        {
+            "audio_path": "path/to/audio/file.wav"
+        }
+    
+    Response:
+        {
+            "success": true,
+            "audio_path": "path/to/audio/file.wav",
+            "predicted_emotion": "happy",
+            "confidence": 0.95,
+            "all_scores": {
+                "angry": 0.01,
+                "calm": 0.02,
+                ...
+            },
+            "top_emotions": [
+                {"emotion": "happy", "score": 0.95},
+                {"emotion": "calm", "score": 0.02},
+                {"emotion": "neutral", "score": 0.01}
+            ]
+        }
     """
     try:
-        # Check if models are loaded
-        if emotion_detector is None or whisper_model is None:
+        # Get JSON data from request
+        data = request.get_json()
+        
+        # Validate request
+        if not data:
             return jsonify({
                 'success': False,
-                'error': 'ML models not initialized'
-            }), 503
-
-        # Get audio file from request
-        if 'audio' not in request.files:
-            return jsonify({
-                'success': False,
-                'error': 'No audio file provided'
+                'error': 'No JSON data provided'
             }), 400
-
-        audio_file = request.files['audio']
-        language = request.form.get('language', 'en')
-
-        # Save uploaded file temporarily
-        temp_dir = Path(config.TEMP_AUDIO_DIR)
-        temp_dir.mkdir(exist_ok=True)
-
-        temp_file_path = temp_dir / f"temp_{os.getpid()}_{audio_file.filename}"
-        audio_file.save(str(temp_file_path))
-
-        try:
-            # Load and process audio
-            print(f"Processing audio file: {audio_file.filename}")
-            audio_data, sample_rate = load_audio(str(temp_file_path))
-
-            # Extract audio features
-            print("Extracting audio features...")
-            audio_features = extract_audio_features(audio_data, sample_rate)
-
-            # Detect emotions
-            print("Detecting emotions...")
-            emotion_scores = emotion_detector.predict(audio_data, sample_rate)
-
-            # Map emotions to emojis
-            suggested_emojis = emotions_to_emojis(emotion_scores, top_k=3)
-
-            # Transcribe audio with Whisper
-            print("Transcribing audio...")
-            transcription_result = whisper_model.transcribe(
-                str(temp_file_path),
-                language=language if language != 'en' else None,
-                fp16=False  # Disable FP16 for CPU compatibility
-            )
-            transcription = transcription_result['text'].strip()
-
-            print(f"✓ Analysis complete: {suggested_emojis[0] if suggested_emojis else 'N/A'}")
-
-            # Return results
+        
+        if 'audio_path' not in data:
             return jsonify({
-                'success': True,
-                'transcription': transcription,
-                'emotionScores': emotion_scores[:5],  # Top 5 emotions
-                'suggestedEmojis': suggested_emojis,
-                'audioFeatures': audio_features,
-            }), 200
-
-        finally:
-            # Clean up temporary file
-            if temp_file_path.exists():
-                temp_file_path.unlink()
-                print(f"Deleted temp file: {temp_file_path}")
-
+                'success': False,
+                'error': 'Missing "audio_path" in request body'
+            }), 400
+        
+        audio_path = data['audio_path']
+        
+        # Check if file exists
+        if not os.path.exists(audio_path):
+            return jsonify({
+                'success': False,
+                'error': f'Audio file not found: {audio_path}'
+            }), 404
+        
+        # Check if it's a file (not a directory)
+        if not os.path.isfile(audio_path):
+            return jsonify({
+                'success': False,
+                'error': f'Path is not a file: {audio_path}'
+            }), 400
+        
+        # Make prediction
+        logger.info(f"Processing audio file: {audio_path}")
+        results = predict_emotion(audio_path)
+        
+        # Return results
+        response = {
+            'success': True,
+            'audio_path': audio_path,
+            'predicted_emotion': results['predicted_emotion'],
+            'confidence': results['confidence'],
+            'all_scores': results['all_scores'],
+            'top_emotions': results['top_emotions']
+        }
+        
+        logger.info(f"Prediction: {results['predicted_emotion']} ({results['confidence']:.2%})")
+        return jsonify(response), 200
+        
     except Exception as e:
-        print(f"Error during analysis: {str(e)}")
-        traceback.print_exc()
-
+        logger.error(f"Error during prediction: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc() if config.FLASK_DEBUG else None
+            'error': str(e)
         }), 500
 
-@app.route('/emojis', methods=['GET'])
-def get_emojis():
-    """Get available emojis grouped by category"""
-    return jsonify({
-        'success': True,
-        'data': get_emojis_by_category()
-    }), 200
 
 @app.errorhandler(404)
 def not_found(error):
-    """Handle 404 errors"""
+    """Handle 404 errors."""
     return jsonify({
         'success': False,
         'error': 'Endpoint not found'
     }), 404
 
+
 @app.errorhandler(500)
 def internal_error(error):
-    """Handle 500 errors"""
+    """Handle 500 errors."""
     return jsonify({
         'success': False,
         'error': 'Internal server error'
     }), 500
 
-if __name__ == '__main__':
-    # Initialize models before starting server
-    initialize_models()
 
-    # Start Flask server
-    app.run(
-        host=config.FLASK_HOST,
-        port=config.FLASK_PORT,
-        debug=config.FLASK_DEBUG
-    )
+if __name__ == '__main__':
+    # Load model before starting the server
+    load_model()
+    
+    # Run the Flask app
+    # Set host='0.0.0.0' to make it accessible from other machines (Docker)
+    app.run(host='0.0.0.0', port=8000, debug=False)

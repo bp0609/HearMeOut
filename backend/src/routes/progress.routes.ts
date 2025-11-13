@@ -5,8 +5,23 @@ import { prisma } from '../services/prisma';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { ProgressSummaryResponse } from '../types';
 import { getActiveAlerts, dismissAlert } from '../services/patternDetection';
+import { getDaysAgoIST, getMonthStartIST, getMonthEndIST, formatDateToString } from '../utils/dateUtils';
 
 const router = Router();
+
+// Helper function to get database user ID from Clerk ID
+async function getUserIdFromClerk(clerkId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new AppError(404, 'User not found in database');
+  }
+
+  return user.id;
+}
 
 /**
  * GET /api/progress/summary
@@ -18,12 +33,11 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { days = '30' } = req.query;
 
     const daysBack = parseInt(days as string);
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - daysBack);
+    const startDate = getDaysAgoIST(daysBack);
 
     // Get mood entries with selected emojis
     const entries = await prisma.moodEntry.findMany({
@@ -95,7 +109,7 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const alerts = await getActiveAlerts(userId);
 
     const formattedAlerts = alerts.map(alert => ({
@@ -123,7 +137,7 @@ router.post(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const { id } = req.params;
 
     await dismissAlert(id, userId);
@@ -145,13 +159,13 @@ router.get(
     if (!req.auth?.userId) {
       throw new AppError(401, 'Unauthorized: Missing user authentication');
     }
-    const userId = req.auth.userId;
+    const userId = await getUserIdFromClerk(req.auth.userId);
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
 
-    // Get first and last day of month
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
+    // Get first and last day of month in IST
+    const firstDay = getMonthStartIST(year, month);
+    const lastDay = getMonthEndIST(year, month);
 
     const entries = await prisma.moodEntry.findMany({
       where: {
@@ -163,6 +177,7 @@ router.get(
       },
       select: {
         entryDate: true,
+        dayOfWeek: true,
         selectedEmoji: true,
       },
       orderBy: {
@@ -172,7 +187,8 @@ router.get(
 
     // Convert to calendar format
     const calendarData = entries.map(entry => ({
-      date: entry.entryDate.toISOString().split('T')[0],
+      date: formatDateToString(entry.entryDate),
+      dayOfWeek: entry.dayOfWeek,
       emoji: entry.selectedEmoji,
     }));
 
