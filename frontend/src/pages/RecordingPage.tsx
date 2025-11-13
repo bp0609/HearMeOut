@@ -14,8 +14,6 @@ export default function RecordingPage() {
   const { toast } = useToast();
   const [step, setStep] = useState<'language' | 'recording' | 'uploading'>('language');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('en');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_isUploading, setIsUploading] = useState(false);
 
   const handleLanguageContinue = () => {
     setStep('recording');
@@ -44,7 +42,6 @@ export default function RecordingPage() {
     console.log('[Recording] Valid audio blob detected, proceeding to upload');
 
     setStep('uploading');
-    setIsUploading(true);
 
     try {
       // Convert blob to file
@@ -96,7 +93,6 @@ export default function RecordingPage() {
       });
 
       setStep('recording');
-      setIsUploading(false);
     }
   };
 
