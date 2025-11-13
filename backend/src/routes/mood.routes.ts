@@ -136,7 +136,7 @@ router.post(
           userId,
           entryDate: todayIST,
           dayOfWeek: getDayOfWeek(todayIST),
-          audioFilePath: audioFilePath,
+          audioFilePath: shouldStoreAudio ? audioFilePath : (null as any), // Only store path if storage is enabled
           duration: body.duration,
           language: body.language,
           selectedEmoji: null, // Will be set when user selects
@@ -337,11 +337,14 @@ router.delete(
       },
     });
 
-    // Delete the audio file
-    const fullPath = path.join(process.cwd(), entry.audioFilePath);
-    deleteAudioFile(fullPath);
-
-    console.log(`Mood entry ${id} deleted, audio file removed: ${entry.audioFilePath}`);
+    // Delete the audio file if it exists
+    if (entry.audioFilePath) {
+      const fullPath = path.join(process.cwd(), entry.audioFilePath);
+      deleteAudioFile(fullPath);
+      console.log(`Mood entry ${id} deleted, audio file removed: ${entry.audioFilePath}`);
+    } else {
+      console.log(`Mood entry ${id} deleted, no audio file to remove`);
+    }
 
     res.json({
       success: true,

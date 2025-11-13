@@ -46,9 +46,11 @@ router.get(
             return;
         }
 
-        // Get all mood entries with audio files
-        const moodEntries = await prisma.moodEntry.findMany({
-            where: { userId: user.id },
+        // Get all mood entries with audio files (filter for non-null audioFilePath)
+        const allEntries = await prisma.moodEntry.findMany({
+            where: {
+                userId: user.id,
+            },
             select: {
                 id: true,
                 entryDate: true,
@@ -64,23 +66,28 @@ router.get(
             },
         });
 
-        // Format the response
-        const recordings = moodEntries.map((entry) => {
-            const fullPath = path.join(process.cwd(), entry.audioFilePath);
-            const fileExists = fs.existsSync(fullPath);
+        // Filter out entries without audio files
+        const moodEntries = allEntries.filter(entry => entry.audioFilePath !== null);
 
-            return {
-                id: entry.id,
-                entryDate: entry.entryDate,
-                dayOfWeek: entry.dayOfWeek,
-                duration: entry.duration,
-                language: entry.language,
-                selectedEmoji: entry.selectedEmoji,
-                createdAt: entry.createdAt,
-                fileExists,
-                audioFilePath: fileExists ? entry.audioFilePath : null,
-            };
-        });
+        // Format the response - filter and map recordings
+        const recordings = moodEntries
+            .filter((entry) => entry.audioFilePath !== null)
+            .map((entry) => {
+                const fullPath = path.join(process.cwd(), entry.audioFilePath!);
+                const fileExists = fs.existsSync(fullPath);
+
+                return {
+                    id: entry.id,
+                    entryDate: entry.entryDate,
+                    dayOfWeek: entry.dayOfWeek,
+                    duration: entry.duration,
+                    language: entry.language,
+                    selectedEmoji: entry.selectedEmoji,
+                    createdAt: entry.createdAt,
+                    fileExists,
+                    audioFilePath: fileExists ? entry.audioFilePath : null,
+                };
+            });
 
         res.json({
             success: true,
@@ -129,9 +136,17 @@ router.delete(
             throw new AppError(403, 'Unauthorized to delete this recording');
         }
 
-        // Delete the audio file from disk
-        const fullPath = path.join(process.cwd(), moodEntry.audioFilePath);
-        deleteAudioFile(fullPath);
+        // Delete the audio file from disk if it exists
+        if (moodEntry.audioFilePath) {
+            const fullPath = path.join(process.cwd(), moodEntry.audioFilePath);
+            deleteAudioFile(fullPath);
+        }
+
+        // Update the mood entry to set audioFilePath to null
+        await prisma.moodEntry.update({
+            where: { id: entryId },
+            data: { audioFilePath: null as any },
+        });
 
         res.json({
             success: true,

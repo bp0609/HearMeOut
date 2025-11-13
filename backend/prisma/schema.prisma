@@ -33,7 +33,7 @@ model MoodEntry {
   dayOfWeek String // Day of week: Sun, Mon, Tue, Wed, Thu, Fri, Sat
 
   // Audio metadata
-  audioFilePath String // Relative path to stored audio file
+  audioFilePath String? // Relative path to stored audio file (nullable when deleted)
   duration      Int // Duration in seconds
   language      String @default("en")
 

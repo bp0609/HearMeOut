@@ -102,26 +102,47 @@ router.patch(
     if (isDisablingAudioStorage) {
       console.log(`[Settings] User ${user.id} disabled audio storage, deleting all audio files...`);
 
-      // Get all mood entries with audio files
-      const moodEntries = await prisma.moodEntry.findMany({
-        where: { userId: user.id },
-        select: { audioFilePath: true },
+      // Get all mood entries with audio files (filter for non-null audioFilePath)
+      const allEntries = await prisma.moodEntry.findMany({
+        where: {
+          userId: user.id,
+        },
+        select: { id: true, audioFilePath: true },
       });
+
+      // Filter entries that have audio files
+      const moodEntries = allEntries.filter(entry => entry.audioFilePath !== null);
 
       // Delete audio files from disk
       for (const entry of moodEntries) {
-        const fullPath = path.join(process.cwd(), entry.audioFilePath);
-        try {
-          if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-            console.log(`[Settings] Deleted audio file: ${fullPath}`);
+        if (entry.audioFilePath) {
+          const fullPath = path.join(process.cwd(), entry.audioFilePath);
+          try {
+            if (fs.existsSync(fullPath)) {
+              fs.unlinkSync(fullPath);
+              console.log(`[Settings] Deleted audio file: ${fullPath}`);
+            }
+          } catch (error) {
+            console.error(`[Settings] Error deleting file ${fullPath}:`, error);
           }
-        } catch (error) {
-          console.error(`[Settings] Error deleting file ${fullPath}:`, error);
         }
       }
 
-      console.log(`[Settings] Deleted ${moodEntries.length} audio files`);
+      // Update all mood entries to set audioFilePath to null
+      // Get the IDs of entries with audio files
+      const entryIds = moodEntries.map(entry => entry.id);
+
+      if (entryIds.length > 0) {
+        await prisma.moodEntry.updateMany({
+          where: {
+            userId: user.id,
+            id: { in: entryIds }
+          },
+          data: { audioFilePath: null as any },
+        });
+      }
+
+      console.log(`[Settings] Deleted ${moodEntries.length} audio files and cleared paths from database`);
     }
 
     // Update or create settings
