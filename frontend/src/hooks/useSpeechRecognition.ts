@@ -68,6 +68,7 @@ export function useSpeechRecognition({
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const finalTranscriptRef = useRef('');
+    const isManualStopRef = useRef(false);
 
     // Check if Web Speech API is supported
     const isSupported =
@@ -157,20 +158,22 @@ export function useSpeechRecognition({
             console.log('[SpeechRecognition] Stopped listening');
             setIsListening(false);
 
-            // Restart if continuous mode is enabled and we didn't manually stop
-            if (continuous && isListening) {
+            // Restart if continuous mode is enabled and wasn't manually stopped
+            if (continuous && !isManualStopRef.current) {
                 try {
                     recognition.start();
                 } catch (err) {
                     console.error('[SpeechRecognition] Failed to restart:', err);
                 }
             }
+            isManualStopRef.current = false;
         };
 
         recognitionRef.current = recognition;
 
         return () => {
             if (recognitionRef.current) {
+                isManualStopRef.current = true;
                 recognitionRef.current.stop();
             }
         };
@@ -198,6 +201,7 @@ export function useSpeechRecognition({
     const stopListening = useCallback(() => {
         if (recognitionRef.current && isListening) {
             try {
+                isManualStopRef.current = true;
                 recognitionRef.current.stop();
                 console.log('[SpeechRecognition] Stopping recognition');
             } catch (err) {
