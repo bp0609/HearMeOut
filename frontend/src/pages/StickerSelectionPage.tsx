@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
-import { ALL_EMOJIS, MOOD_EMOJIS } from '@/lib/constants';
+import { MOOD_EMOJIS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 export default function StickerSelectionPage() {

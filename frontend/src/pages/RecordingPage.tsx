@@ -14,7 +14,8 @@ export default function RecordingPage() {
   const { toast } = useToast();
   const [step, setStep] = useState<'language' | 'recording' | 'uploading'>('language');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('en');
-  const [isUploading, setIsUploading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isUploading, setIsUploading] = useState(false);
 
   const handleLanguageContinue = () => {
     setStep('recording');

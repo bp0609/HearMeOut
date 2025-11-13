@@ -11,7 +11,31 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * IST timezone offset in minutes (UTC+5:30)
+ */
+const IST_OFFSET_MINUTES = 330;
+
+/**
+ * Get current date in IST timezone (YYYY-MM-DD format)
+ * This ensures we're working with the correct "today" according to Indian time
+ */
+export function getTodayIST(): string {
+  const now = new Date();
+  
+  // Get current UTC time and add IST offset
+  const istTime = new Date(now.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
+  
+  // Extract date components in IST
+  const year = istTime.getUTCFullYear();
+  const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(istTime.getUTCDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Format date to YYYY-MM-DD
+ * @deprecated Use getTodayIST() for current date in IST
  */
 export function formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -53,7 +77,15 @@ export function getFirstDayOfMonth(year: number, month: number): number {
 }
 
 /**
+ * Check if a date string (YYYY-MM-DD) is today in IST
+ */
+export function isTodayIST(dateString: string): boolean {
+  return dateString === getTodayIST();
+}
+
+/**
  * Check if date is today
+ * @deprecated Use isTodayIST() with date string for IST-aware checking
  */
 export function isToday(date: Date): boolean {
   const today = new Date();
@@ -153,4 +185,42 @@ export function debounce<T extends (...args: any[]) => any>(
     clearTimeout(timeout);
     timeout = setTimeout(later, wait);
   };
+}
+
+/**
+ * Validate date string format (YYYY-MM-DD)
+ */
+export function isValidDateFormat(dateString: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateString);
+}
+
+/**
+ * Check if a date string is in the future (IST)
+ */
+export function isFutureIST(dateString: string): boolean {
+  if (!isValidDateFormat(dateString)) {
+    return false;
+  }
+  const today = getTodayIST();
+  return dateString > today;
+}
+
+/**
+ * Check if a date string is in the past (IST)
+ */
+export function isPastIST(dateString: string): boolean {
+  if (!isValidDateFormat(dateString)) {
+    return false;
+  }
+  const today = getTodayIST();
+  return dateString < today;
+}
+
+/**
+ * Get current IST time as a readable string for display
+ */
+export function getCurrentISTString(): string {
+  const now = new Date();
+  const istTime = new Date(now.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
+  return istTime.toISOString().replace('Z', '+05:30');
 }

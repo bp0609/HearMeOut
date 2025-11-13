@@ -7,6 +7,7 @@ import { analyzeAudio } from '../services/mlService';
 import { checkForPatterns } from '../services/patternDetection';
 import { audioUpload, deleteAudioFile } from '../middleware/fileUpload';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
+import { getTodayIST, parseDateString, formatDateToString, getCurrentISTString } from '../utils/dateUtils';
 
 const router = Router();
 
@@ -94,16 +95,16 @@ router.post(
         duration: parseInt(req.body.duration),
       });
 
-      // Get today's date (midnight)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Get today's date in IST timezone
+      const todayIST = getTodayIST();
+      console.log(`[IST] Current IST time: ${getCurrentISTString()}, Today's date: ${formatDateToString(todayIST)}`);
 
       // Check if entry already exists for today
       const existingEntry = await prisma.moodEntry.findUnique({
         where: {
           userId_entryDate: {
             userId,
-            entryDate: today,
+            entryDate: todayIST,
           },
         },
       });
@@ -124,7 +125,7 @@ router.post(
       const moodEntry = await prisma.moodEntry.create({
         data: {
           userId,
-          entryDate: today,
+          entryDate: todayIST,
           duration: body.duration,
           language: body.language,
           transcription: null, // We're not doing transcription anymore, just emotion detection
@@ -142,16 +143,13 @@ router.post(
         },
       });
 
-      // CRITICAL: Delete audio file immediately after processing
-      deleteAudioFile(file.path);
-
       console.log(`Mood entry created for user ${userId}, audio file deleted`);
 
       res.status(201).json({
         success: true,
         data: {
           id: moodEntry.id,
-          entryDate: moodEntry.entryDate.toISOString().split('T')[0],
+          entryDate: formatDateToString(moodEntry.entryDate),
           predictedEmotion: mlResult.predicted_emotion,
           confidence: mlResult.confidence,
           transcription: moodEntry.transcription,
@@ -259,7 +257,7 @@ router.get(
       success: true,
       data: entries.map(entry => ({
         ...entry,
-        entryDate: entry.entryDate.toISOString().split('T')[0],
+        entryDate: formatDateToString(entry.entryDate),
       })),
     });
   })
@@ -278,8 +276,12 @@ router.get(
     const userId = await getUserIdFromClerk(req.auth.userId);
     const { date } = req.params;
 
-    const entryDate = new Date(date);
-    entryDate.setHours(0, 0, 0, 0);
+    // Parse and validate date string
+    try {
+      var entryDate = parseDateString(date);
+    } catch (err: any) {
+      throw new AppError(400, `Invalid date format: ${err.message}`);
+    }
 
     const entry = await prisma.moodEntry.findUnique({
       where: {
@@ -306,7 +308,7 @@ router.get(
       success: true,
       data: entry ? {
         ...entry,
-        entryDate: entry.entryDate.toISOString().split('T')[0],
+        entryDate: formatDateToString(entry.entryDate),
       } : null,
     });
   })

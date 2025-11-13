@@ -3,15 +3,15 @@ import { UserButton } from '@clerk/clerk-react';
 import { Calendar, TrendingUp, Settings, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoodCalendar } from '@/components/Calendar/MoodCalendar';
-import { formatDate } from '@/lib/utils';
+import { getTodayIST } from '@/lib/utils';
 import { useMoodEntryByDate } from '@/hooks/useMoodData';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, isLoaded } = useAuth();
-  const today = formatDate(new Date());
-  const { entry, loading: entryLoading } = useMoodEntryByDate(today);
+  const today = getTodayIST(); // Use IST timezone for current date
+  const { entry } = useMoodEntryByDate(today);
 
   // Wait for auth to load before showing content
   if (!isLoaded) {

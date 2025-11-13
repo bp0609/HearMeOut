@@ -5,6 +5,7 @@ import { prisma } from '../services/prisma';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { ProgressSummaryResponse } from '../types';
 import { getActiveAlerts, dismissAlert } from '../services/patternDetection';
+import { getDaysAgoIST, getMonthStartIST, getMonthEndIST, formatDateToString } from '../utils/dateUtils';
 
 const router = Router();
 
@@ -36,8 +37,7 @@ router.get(
     const { days = '30' } = req.query;
 
     const daysBack = parseInt(days as string);
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - daysBack);
+    const startDate = getDaysAgoIST(daysBack);
 
     // Get mood entries with selected emojis
     const entries = await prisma.moodEntry.findMany({
@@ -163,9 +163,14 @@ router.get(
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
 
-    // Get first and last day of month
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
+    // Validate month
+    if (month < 1 || month > 12) {
+      throw new AppError(400, 'Invalid month. Must be between 1 and 12.');
+    }
+
+    // Get first and last day of month in IST
+    const firstDay = getMonthStartIST(year, month);
+    const lastDay = getMonthEndIST(year, month);
 
     const entries = await prisma.moodEntry.findMany({
       where: {
@@ -186,7 +191,7 @@ router.get(
 
     // Convert to calendar format
     const calendarData = entries.map(entry => ({
-      date: entry.entryDate.toISOString().split('T')[0],
+      date: formatDateToString(entry.entryDate),
       emoji: entry.selectedEmoji,
     }));
 
