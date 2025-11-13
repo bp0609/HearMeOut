@@ -4,6 +4,7 @@ import { ArrowLeft, Database, Trash2, Calendar, Clock, Globe } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
+import { getTodayIST } from '@/lib/utils';
 import { useToast } from '@/hooks/useToast';
 import type { AudioRecording } from '@/types';
 
@@ -50,7 +51,7 @@ export default function DataHistoryPage() {
 
     const checkTodayEntry = async () => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayIST();
             const entry = await api.getMoodEntryByDate(today);
             setHasCheckedInToday(!!entry);
         } catch (error) {
