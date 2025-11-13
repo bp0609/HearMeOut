@@ -23,9 +23,9 @@ const allowedOrigins = [
   'https://localhost:5173',
   'http://127.0.0.1:5173',
   'https://127.0.0.1:5173',
-  'https://10.7.14.58:5173',
+  process.env.DEV_IP ? `https://${process.env.DEV_IP}:5173` : null,
   process.env.FRONTEND_URL || 'http://localhost:5173',
-].filter((origin, index, self) => self.indexOf(origin) === index); // Remove duplicates
+].filter((origin, index, self) => origin && self.indexOf(origin) === index); // Remove duplicates and nulls
 
 // Middleware
 app.use(cors({
