@@ -27,23 +27,23 @@ model User {
 
 // Mood Entry - one per day per user
 model MoodEntry {
-  id              String   @id @default(uuid())
-  userId          String
-  entryDate       DateTime @db.Date
-  dayOfWeek       String?  // Day of week: Sun, Mon, Tue, Wed, Thu, Fri, Sat
+  id        String   @id @default(uuid())
+  userId    String
+  entryDate DateTime @db.Date
+  dayOfWeek String // Day of week: Sun, Mon, Tue, Wed, Thu, Fri, Sat
 
   // Audio metadata
-  audioFilePath   String   // Relative path to stored audio file
-  duration        Int      // Duration in seconds
-  language        String   @default("en")
+  audioFilePath String // Relative path to stored audio file
+  duration      Int // Duration in seconds
+  language      String @default("en")
 
   // User's selected emoji (null until user selects)
-  selectedEmoji   String?  // User's final choice from 8 emotions
+  selectedEmoji String? // User's final choice from 8 emotions
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, entryDate])
   @@index([userId, entryDate(sort: Desc)])
@@ -52,15 +52,15 @@ model MoodEntry {
 
 // Pattern Alerts - triggered by detection algorithm
 model PatternAlert {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   userId         String
-  alertType      String   // consecutive_low, sudden_drop, etc.
-  detectedAt     DateTime @default(now())
-  patternDetails Json     // Metadata about the detected pattern
-  dismissed      Boolean  @default(false)
+  alertType      String // consecutive_low, sudden_drop, etc.
+  detectedAt     DateTime  @default(now())
+  patternDetails Json // Metadata about the detected pattern
+  dismissed      Boolean   @default(false)
   dismissedAt    DateTime?
 
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, dismissed])
   @@index([userId, detectedAt(sort: Desc)])
@@ -68,20 +68,20 @@ model PatternAlert {
 
 // User Settings - preferences and privacy controls
 model UserSettings {
-  userId                String   @id
-  reminderEnabled       Boolean  @default(false)
-  reminderTime          String?  // Format: "HH:MM" (24-hour)
-  interventionThreshold Int      @default(5) // Days of low mood before alert
-  cloudStorageEnabled   Boolean  @default(false)
-  preferredLanguage     String   @default("en")
-  
+  userId                String  @id
+  reminderEnabled       Boolean @default(false)
+  reminderTime          String? // Format: "HH:MM" (24-hour)
+  interventionThreshold Int     @default(5) // Days of low mood before alert
+  cloudStorageEnabled   Boolean @default(false)
+  preferredLanguage     String  @default("en")
+
   // Audio storage consent - null means not asked yet, true/false means user decision
-  audioStorageConsent   Boolean? // null = not asked, true = agreed, false = denied
-  consentGivenAt        DateTime? // When the user made their consent decision
-  audioStorageEnabled   Boolean  @default(false) // Current audio storage setting
+  audioStorageConsent Boolean? // null = not asked, true = agreed, false = denied
+  consentGivenAt      DateTime? // When the user made their consent decision
+  audioStorageEnabled Boolean   @default(false) // Current audio storage setting
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

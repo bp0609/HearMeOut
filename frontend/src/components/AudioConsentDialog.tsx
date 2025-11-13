@@ -30,7 +30,7 @@ export default function AudioConsentDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={() => { }}>
+        <Dialog open={open} onOpenChange={() => { }} /* Prevent closing without making a decision */>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <div className="flex items-center gap-3 mb-2">
