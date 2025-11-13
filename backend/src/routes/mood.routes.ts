@@ -273,7 +273,7 @@ router.get(
 
     // Parse and validate date string
     try {
-      var entryDate = parseDateString(date);
+      const entryDate = parseDateString(date);
     } catch (err: any) {
       throw new AppError(400, `Invalid date format: ${err.message}`);
     }
