@@ -163,11 +163,6 @@ router.get(
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
 
-    // Validate month
-    if (month < 1 || month > 12) {
-      throw new AppError(400, 'Invalid month. Must be between 1 and 12.');
-    }
-
     // Get first and last day of month in IST
     const firstDay = getMonthStartIST(year, month);
     const lastDay = getMonthEndIST(year, month);
