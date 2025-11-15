@@ -154,7 +154,8 @@ class ApiClient {
   async updateMoodEntry(
     id: string,
     data: {
-      selectedEmoji: string;
+      selectedEmoji?: string;
+      activityKeys?: string[];
       activityTags?: string[];
       userNotes?: string;
     }
@@ -239,7 +240,7 @@ class ApiClient {
   /**
    * Get mood trend data
    */
-  async getMoodTrend(params?: { year?: number; month?: number }): Promise<Array<{ date: string; emoji: string }>> {
+  async getMoodTrend(params?: { year?: number; month?: number }): Promise<Array<{ date: string; emoji: string; activityKeys: string[] }>> {
     const response = await this.client.get('/api/progress/mood-trend', {
       params,
     });
@@ -297,6 +298,54 @@ class ApiClient {
    */
   async deleteAudioRecording(entryId: string): Promise<void> {
     await this.client.delete(`/api/audio/recordings/${entryId}`);
+  }
+
+  /**
+   * Fetch audio blob for playback with authentication
+   */
+  async getAudioBlob(entryId: string): Promise<Blob> {
+    const response = await this.client.get(`/api/audio/recordings/${entryId}/play`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  // Activity endpoints
+
+  /**
+   * Get all predefined activities
+   */
+  async getActivities(): Promise<import('../types').Activity[]> {
+    const response = await this.client.get('/api/activities');
+    return response.data;
+  }
+
+  /**
+   * Get activity statistics
+   */
+  async getActivityStats(params?: {
+    year?: number;
+    month?: number;
+  }): Promise<{
+    stats: import('../types').ActivityStats[];
+    totalEntries: number;
+  }> {
+    const response = await this.client.get('/api/activities/stats', { params });
+    return response.data;
+  }
+
+  /**
+   * Get activity-mood correlations
+   */
+  async getActivityMoodCorrelation(params?: {
+    year?: number;
+    month?: number;
+  }): Promise<{
+    correlations: import('../types').ActivityMoodCorrelation[];
+    totalEntries: number;
+  }> {
+    const response = await this.client.get('/api/activities/mood-correlation', { params });
+    return response.data;
   }
 
   // Health check

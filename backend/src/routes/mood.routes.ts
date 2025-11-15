@@ -45,7 +45,8 @@ const createMoodSchema = z.object({
 });
 
 const updateMoodSchema = z.object({
-  selectedEmoji: z.string(),
+  selectedEmoji: z.string().optional(),
+  activityKeys: z.array(z.string()).optional(),
 });
 
 /**
@@ -169,7 +170,7 @@ router.post(
 
 /**
  * PATCH /api/moods/:id
- * Update mood entry with selected emoji and optional context
+ * Update mood entry with selected emoji and/or activities
  */
 router.patch(
   '/:id',
@@ -183,25 +184,62 @@ router.patch(
     // Validate request body
     const body = updateMoodSchema.parse(req.body);
 
-    // Update mood entry with selected emoji
+    // Build update data
+    const updateData: any = {};
+    if (body.selectedEmoji) {
+      updateData.selectedEmoji = body.selectedEmoji;
+    }
+
+    // Update mood entry
     const moodEntry = await prisma.moodEntry.update({
       where: {
         id,
         userId, // Ensure user owns this entry
       },
-      data: {
-        selectedEmoji: body.selectedEmoji,
-      },
+      data: updateData,
     });
 
-    // Run pattern detection after user selects emoji
-    await checkForPatterns(userId, moodEntry);
+    // Handle activity updates if provided
+    if (body.activityKeys !== undefined) {
+      // Delete existing activities
+      await prisma.moodEntryActivity.deleteMany({
+        where: { moodEntryId: id },
+      });
+
+      // Create new activity associations
+      if (body.activityKeys.length > 0) {
+        await prisma.moodEntryActivity.createMany({
+          data: body.activityKeys.map(activityKey => ({
+            moodEntryId: id,
+            activityKey,
+          })),
+        });
+      }
+    }
+
+    // Run pattern detection if emoji was selected
+    if (body.selectedEmoji) {
+      await checkForPatterns(userId, moodEntry);
+    }
+
+    // Fetch updated entry with activities
+    const updatedEntry = await prisma.moodEntry.findUnique({
+      where: { id },
+      include: {
+        activities: {
+          include: {
+            activity: true,
+          },
+        },
+      },
+    });
 
     res.json({
       success: true,
       data: {
-        id: moodEntry.id,
-        selectedEmoji: moodEntry.selectedEmoji,
+        id: updatedEntry!.id,
+        selectedEmoji: updatedEntry!.selectedEmoji,
+        activities: updatedEntry!.activities,
       },
     });
   })
@@ -245,6 +283,7 @@ router.get(
         dayOfWeek: true,
         selectedEmoji: true,
         createdAt: true,
+        activities: true,
       },
     });
 
@@ -286,12 +325,12 @@ router.get(
           entryDate,
         },
       },
-      select: {
-        id: true,
-        entryDate: true,
-        dayOfWeek: true,
-        selectedEmoji: true,
-        createdAt: true,
+      include: {
+        activities: {
+          include: {
+            activity: true,
+          },
+        },
       },
     });
 

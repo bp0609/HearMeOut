@@ -36,11 +36,8 @@ export async function requireAuth(
       return;
     }
 
-    // Attach auth info to request
-    (req as AuthenticatedRequest).auth = {
-      userId: auth.userId,
-      sessionId: auth.sessionId || '',
-    };
+    // Note: We don't need to set req.auth - it's already set by clerkMiddleware()
+    // We just need to ensure the user exists in our database
 
     // Ensure user exists in our database
     await ensureUserExists(auth.userId);

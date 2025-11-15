@@ -174,11 +174,17 @@ router.get(
           gte: firstDay,
           lte: lastDay,
         },
+        selectedEmoji: { not: null }, // Only return completed entries
       },
       select: {
         entryDate: true,
         dayOfWeek: true,
         selectedEmoji: true,
+        activities: {
+          include: {
+            activity: true,
+          },
+        },
       },
       orderBy: {
         entryDate: 'asc',
@@ -190,6 +196,13 @@ router.get(
       date: formatDateToString(entry.entryDate),
       dayOfWeek: entry.dayOfWeek,
       emoji: entry.selectedEmoji,
+      activities: entry.activities.map(a => ({
+        id: a.id,
+        moodEntryId: a.moodEntryId,
+        activityKey: a.activityKey,
+        createdAt: a.createdAt,
+        activity: a.activity,
+      })),
     }));
 
     res.json({
@@ -381,7 +394,7 @@ router.get(
 
 /**
  * GET /api/progress/mood-trend
- * Get mood trend over time for line chart
+ * Get mood trend over time for line chart with activities
  */
 router.get(
   '/mood-trend',
@@ -410,9 +423,8 @@ router.get(
             lte: lastDay,
           },
         },
-        select: {
-          entryDate: true,
-          selectedEmoji: true,
+        include: {
+          activities: true,
         },
         orderBy: {
           entryDate: 'asc',
@@ -425,9 +437,8 @@ router.get(
           userId,
           selectedEmoji: { not: null },
         },
-        select: {
-          entryDate: true,
-          selectedEmoji: true,
+        include: {
+          activities: true,
         },
         orderBy: {
           entryDate: 'asc',
@@ -438,6 +449,7 @@ router.get(
     const trendData = entries.map(entry => ({
       date: formatDateToString(entry.entryDate),
       emoji: entry.selectedEmoji,
+      activityKeys: entry.activities.map(a => a.activityKey),
     }));
 
     res.json({

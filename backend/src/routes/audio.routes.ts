@@ -100,6 +100,74 @@ router.get(
 );
 
 /**
+ * GET /api/audio/recordings/:entryId/play
+ * Stream audio file for playback
+ */
+router.get(
+    '/recordings/:entryId/play',
+    asyncHandler(async (req: Request, res: Response) => {
+        if (!req.auth?.userId) {
+            throw new AppError(401, 'Unauthorized: Missing user authentication');
+        }
+        const clerkId = req.auth.userId;
+        const { entryId } = req.params;
+
+        // Get user
+        const user = await prisma.user.findUnique({
+            where: { clerkId },
+        });
+
+        if (!user) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        // Get the mood entry
+        const moodEntry = await prisma.moodEntry.findUnique({
+            where: { id: entryId },
+            select: {
+                userId: true,
+                audioFilePath: true,
+            },
+        });
+
+        if (!moodEntry) {
+            throw new AppError(404, 'Recording not found');
+        }
+
+        // Verify ownership
+        if (moodEntry.userId !== user.id) {
+            throw new AppError(403, 'Unauthorized to access this recording');
+        }
+
+        // Check if audio file exists
+        if (!moodEntry.audioFilePath) {
+            throw new AppError(404, 'Audio file not found for this entry');
+        }
+
+        const fullPath = path.join(process.cwd(), moodEntry.audioFilePath);
+
+        // Check if file exists on disk
+        if (!fs.existsSync(fullPath)) {
+            throw new AppError(404, 'Audio file does not exist on disk');
+        }
+
+        // Get file stats for Content-Length
+        const stat = fs.statSync(fullPath);
+
+        // Set appropriate headers for audio streaming
+        res.setHeader('Content-Type', 'audio/webm');
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Cache-Control', 'no-cache');
+
+        // Stream the file
+        const fileStream = fs.createReadStream(fullPath);
+        fileStream.pipe(res);
+    })
+);
+
+/**
  * DELETE /api/audio/recordings/:entryId
  * Delete a specific audio recording
  */

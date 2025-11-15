@@ -45,10 +45,11 @@ export default function StickerSelectionPage() {
 
       toast({
         title: 'Mood saved!',
-        description: 'Your daily check-in is complete',
+        description: 'Now tell us about your activities',
       });
 
-      navigate('/');
+      // Navigate to activity selection page
+      navigate(`/select-activities/${entryId}`);
     } catch (error) {
       console.error('Error saving mood:', error);
       toast({

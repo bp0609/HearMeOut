@@ -7,6 +7,7 @@ import { api } from './lib/api';
 import HomePage from './pages/HomePage';
 import RecordingPage from './pages/RecordingPage';
 import StickerSelectionPage from './pages/StickerSelectionPage';
+import ActivitySelectionPage from './pages/ActivitySelectionPage';
 import ProgressPage from './pages/ProgressPage';
 import SettingsPage from './pages/SettingsPage';
 import DataHistoryPage from './pages/DataHistoryPage';
@@ -100,6 +101,7 @@ function ConsentHandler() {
         <Route path="/" element={<HomePage />} />
         <Route path="/record" element={<RecordingPage />} />
         <Route path="/select-sticker/:entryId" element={<StickerSelectionPage />} />
+        <Route path="/select-activities/:entryId" element={<ActivitySelectionPage />} />
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/data-history" element={<DataHistoryPage />} />

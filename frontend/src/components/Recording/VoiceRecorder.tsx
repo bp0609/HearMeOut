@@ -1,19 +1,23 @@
-import { Mic, Square, Play, Pause } from 'lucide-react';
+import { Mic, Square, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { formatDuration } from '@/lib/utils';
 import { RECORDING_CONFIG } from '@/lib/constants';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Language } from '@/types';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
+  onRecordingStopped?: (audioBlob: Blob, duration: number) => void;
   language?: Language;
 }
 
-export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, onRecordingStopped, language = 'en' }: VoiceRecorderProps) {
+  const [recordingFinished, setRecordingFinished] = useState(false);
+  const [savedAudioData, setSavedAudioData] = useState<{ blob: Blob; duration: number } | null>(null);
+
   const {
     isRecording,
     isPaused,
@@ -23,6 +27,7 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
     stopRecording,
     pauseRecording,
     resumeRecording,
+    resetRecording,
     error,
   } = useAudioRecorder();
 
@@ -82,10 +87,30 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
 
   useEffect(() => {
     if (audioBlob && !isRecording) {
-      console.log('[VoiceRecorder] Triggering recording complete callback');
-      onRecordingCompleteRef.current(audioBlob, duration);
+      console.log('[VoiceRecorder] Recording stopped, showing retry option');
+      setRecordingFinished(true);
+      setSavedAudioData({ blob: audioBlob, duration });
+
+      // Call onRecordingStopped if provided (to show retry option)
+      if (onRecordingStopped) {
+        onRecordingStopped(audioBlob, duration);
+      }
     }
-  }, [audioBlob, isRecording, duration]);
+  }, [audioBlob, isRecording, duration, onRecordingStopped]);
+
+  const handleRetry = () => {
+    console.log('[VoiceRecorder] Retry clicked - resetting recording');
+    setRecordingFinished(false);
+    setSavedAudioData(null);
+    resetRecording();
+  };
+
+  const handleConfirm = () => {
+    console.log('[VoiceRecorder] Confirm clicked - proceeding with upload');
+    if (savedAudioData) {
+      onRecordingCompleteRef.current(savedAudioData.blob, savedAudioData.duration);
+    }
+  };
 
   return (
     <Card className="p-8">
@@ -185,7 +210,7 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
 
         {/* Controls */}
         <div className="flex items-center justify-center gap-4">
-          {!isRecording ? (
+          {!isRecording && !recordingFinished ? (
             <Button
               size="lg"
               onClick={startRecording}
@@ -195,6 +220,31 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
               <Mic className="mr-2 h-5 w-5" />
               Start Recording
             </Button>
+          ) : recordingFinished ? (
+            <div className="flex flex-col items-center gap-3 w-full">
+              <p className="text-sm text-muted-foreground">
+                Recording complete! Confirm or retry.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleRetry}
+                  className="px-8"
+                >
+                  <RotateCcw className="mr-2 h-5 w-5" />
+                  Retry
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={handleConfirm}
+                  className="px-8"
+                >
+                  <Mic className="mr-2 h-5 w-5" />
+                  Confirm & Continue
+                </Button>
+              </div>
+            </div>
           ) : (
             <>
               {!isPaused ? (

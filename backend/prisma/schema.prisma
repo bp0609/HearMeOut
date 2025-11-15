@@ -43,7 +43,8 @@ model MoodEntry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities MoodEntryActivity[]
 
   @@unique([userId, entryDate])
   @@index([userId, entryDate(sort: Desc)])
@@ -84,4 +85,35 @@ model UserSettings {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Activity - predefined activities that users can associate with their moods
+model Activity {
+  id        String   @id @default(uuid())
+  key       String   @unique // e.g., "social", "work", "workout"
+  icon      String // emoji icon
+  label     String // display name like "Meeting Friends"
+  color     String // hex color for visualizations
+  order     Int      @default(0) // display order
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  moodEntryActivities MoodEntryActivity[]
+
+  @@index([order])
+}
+
+// Many-to-many relation between MoodEntry and Activity
+model MoodEntryActivity {
+  id          String   @id @default(uuid())
+  moodEntryId String
+  activityKey String // reference to Activity.key
+  createdAt   DateTime @default(now())
+
+  moodEntry MoodEntry @relation(fields: [moodEntryId], references: [id], onDelete: Cascade)
+  activity  Activity  @relation(fields: [activityKey], references: [key], onDelete: Cascade)
+
+  @@unique([moodEntryId, activityKey])
+  @@index([moodEntryId])
+  @@index([activityKey])
 }
