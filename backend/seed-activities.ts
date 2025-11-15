@@ -14,10 +14,12 @@ const PREDEFINED_ACTIVITIES = [
     { key: 'cooking', icon: '🍽️', label: 'Cooking', color: '#FFD93D', order: 9 },
     { key: 'creative', icon: '🎨', label: 'Creative Work', color: '#FF9FF3', order: 10 },
     { key: 'shopping', icon: '🛍️', label: 'Shopping', color: '#F9CA24', order: 11 },
-    { key: 'home', icon: '🏠', label: 'At Home', color: '#74B9FF', order: 12 },
-    { key: 'outdoor', icon: '🌳', label: 'Outdoor Activity', color: '#55E6C1', order: 13 },
-    { key: 'reading', icon: '📖', label: 'Reading', color: '#FDA7DF', order: 14 },
-    { key: 'music', icon: '🎵', label: 'Music/Entertainment', color: '#C7ECEE', order: 15 },
+    { key: 'reading', icon: '📖', label: 'Reading', color: '#FDA7DF', order: 12 },
+    { key: 'music', icon: '🎵', label: 'Music/Entertainment', color: '#C7ECEE', order: 13 },
+    { key: 'sports', icon: '🏆', label: 'Sports', color: '#FF6B6B', order: 14 },
+    { key: 'dancing', icon: '💃', label: 'Dancing', color: '#FF6B6B', order: 15 },
+    { key: 'singing', icon: '🎤', label: 'Singing', color: '#FF6B6B', order: 16 },
+    { key: 'writing', icon: '📝', label: 'Writing', color: '#FF6B6B', order: 17 },
 ];
 
 async function seedActivities() {

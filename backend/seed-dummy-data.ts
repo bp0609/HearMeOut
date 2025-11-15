@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Email to seed data for
-const TEST_EMAIL = 'hitesh.kumar@iitgn.ac.in';
+const TEST_EMAIL = 'patelbhavik03.bp@gmail.com';
 
 // The 8 specific emojis we use (one per emotion category)
 const EMOTION_EMOJIS = {

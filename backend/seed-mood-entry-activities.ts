@@ -4,12 +4,12 @@ const prisma = new PrismaClient();
 
 // Map emojis to likely activities (for realistic seed data)
 const emojiToActivities: Record<string, string[]> = {
-    '😊': ['social', 'family', 'outdoor', 'music'],
+    '😊': ['social', 'family', 'dancing', 'music', 'sports'],
     '🤗': ['family', 'social', 'creative', 'music'],
-    '😌': ['relaxing', 'reading', 'music', 'home'],
-    '😢': ['home', 'relaxing', 'reading'],
-    '😠': ['workout', 'gaming', 'home'],
-    '😰': ['work', 'study', 'home'],
+    '😌': ['relaxing', 'reading', 'music', 'singing'],
+    '😢': ['writing', 'relaxing', 'reading'],
+    '😠': ['workout', 'gaming', 'sports'],
+    '😰': ['work', 'study', 'writing'],
 };
 
 // Get random items from array
@@ -53,7 +53,7 @@ async function seedMoodEntryActivities() {
             }
 
             // Get likely activities for this emoji
-            const likelyActivities = emojiToActivities[entry.selectedEmoji || ''] || ['home', 'relaxing'];
+            const likelyActivities = emojiToActivities[entry.selectedEmoji || ''] || ['relaxing'];
 
             // Randomly select 1-3 activities
             const activityCount = Math.floor(Math.random() * 3) + 1;
