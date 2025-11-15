@@ -3,38 +3,6 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-// Mood emojis organized by category
-export const MOOD_EMOJIS = {
-  great: ['😊', '😄', '🥰', '😁', '🤗', '💚', '😍', '🌟', '✨', '🎉'],
-  good: ['🙂', '😌', '😇', '🤓', '💛', '😎', '👍', '☺️', '😏', '🙃'],
-  okay: ['😐', '😑', '🤔', '😶', '💙', '😏', '🙃', '😬', '🤨', '😕'],
-  low: ['😔', '😞', '😕', '😟', '🧡', '😐', '😥', '😓', '😪', '😩'],
-  terrible: ['😢', '😭', '😰', '😨', '💔', '😖', '😩', '😱', '😣', '😫'],
-} as const;
-
-// All emojis flattened
-export const ALL_EMOJIS = [
-  ...MOOD_EMOJIS.great,
-  ...MOOD_EMOJIS.good,
-  ...MOOD_EMOJIS.okay,
-  ...MOOD_EMOJIS.low,
-  ...MOOD_EMOJIS.terrible,
-];
-
-// Activity tags
-export const ACTIVITY_TAGS = [
-  { id: 'exercise', label: 'Exercise', icon: '🏃' },
-  { id: 'sleep_well', label: 'Slept Well', icon: '😴' },
-  { id: 'sleep_poor', label: 'Poor Sleep', icon: '😫' },
-  { id: 'social_time', label: 'Social Time', icon: '👥' },
-  { id: 'alone_time', label: 'Alone Time', icon: '🧘' },
-  { id: 'work_stress', label: 'Work Stress', icon: '💼' },
-  { id: 'relaxation', label: 'Relaxation', icon: '🌸' },
-  { id: 'nature', label: 'Nature', icon: '🌳' },
-  { id: 'creative', label: 'Creative Work', icon: '🎨' },
-  { id: 'learning', label: 'Learning', icon: '📚' },
-] as const;
-
 // Languages
 export const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇺🇸' },
@@ -71,3 +39,61 @@ export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+// 8 Emotion categories (matching ML service emotions)
+export const EMOTIONS = {
+  happy: { label: 'Happy', emoji: '😊', level: 8, color: '#10b981' },
+  excited: { label: 'Excited', emoji: '🤗', level: 7, color: '#84cc16' },
+  neutral: { label: 'Neutral', emoji: '😐', level: 6, color: '#fbbf24' },
+  calm: { label: 'Calm', emoji: '😌', level: 5, color: '#06b6d4' },
+  sad: { label: 'Sad', emoji: '😢', level: 4, color: '#f97316' },
+  angry: { label: 'Angry', emoji: '😠', level: 3, color: '#ef4444' },
+  fearful: { label: 'Fearful', emoji: '😨', level: 2, color: '#a855f7' },
+  disgusted: { label: 'Disgusted', emoji: '🤢', level: 1, color: '#ec4899' },
+} as const;
+
+export type EmotionKey = keyof typeof EMOTIONS;
+
+// Emotion order for charts (best to worst)
+export const EMOTION_ORDER: EmotionKey[] = ['happy', 'excited', 'calm', 'neutral', 'sad', 'angry', 'fearful', 'disgusted'];
+
+// Map emoji to emotion category
+export const getEmotionFromEmoji = (emoji: string): EmotionKey => {
+  // Happy emojis
+  if (['😊', '😄', '🥰', '😁', '😍', '🌟', '✨', '🎉'].includes(emoji)) return 'happy';
+  // Excited/energetic emojis
+  if (['🤗', '😎', '🙃', '🤓'].includes(emoji)) return 'excited';
+  // Calm emojis
+  if (['😌', '😇', '🙂', '☺️'].includes(emoji)) return 'calm';
+  // Neutral emojis
+  if (['😐', '😑', '🤔', '😶', '😬', '🤨'].includes(emoji)) return 'neutral';
+  // Sad emojis
+  if (['😢', '😭', '😔', '😞', '😟', '😥', '😓', '😪'].includes(emoji)) return 'sad';
+  // Angry emojis
+  if (['😠', '😡', '😤', '💢', '😖', '😩', '😫', '😣'].includes(emoji)) return 'angry';
+  // Fearful emojis
+  if (['😨', '😰', '😱', '😧'].includes(emoji)) return 'fearful';
+  // Disgusted emojis
+  if (['🤢', '🤮', '😒', '🙄', '💔'].includes(emoji)) return 'disgusted';
+
+  // Default to neutral
+  return 'neutral';
+};
+
+// Get emotion level (1-8) from emoji
+export const getEmotionLevel = (emoji: string): number => {
+  const emotion = getEmotionFromEmoji(emoji);
+  return EMOTIONS[emotion].level;
+};
+
+// Get emotion label from emoji
+export const getEmotionLabel = (emoji: string): string => {
+  const emotion = getEmotionFromEmoji(emoji);
+  return EMOTIONS[emotion].label;
+};
+
+// Get emotion emoji from level
+export const getEmotionEmojiFromLevel = (level: number): string => {
+  const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === level);
+  return emotion ? EMOTIONS[emotion].emoji : '😐';
+};

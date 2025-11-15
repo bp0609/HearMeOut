@@ -226,6 +226,36 @@ class ApiClient {
     await this.client.post(`/api/progress/alerts/${id}/dismiss`);
   }
 
+  /**
+   * Get weekday mood distribution
+   */
+  async getWeekdayDistribution(params?: { year?: number; month?: number }): Promise<Record<string, Record<string, number>>> {
+    const response = await this.client.get('/api/progress/weekday-distribution', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Get mood trend data
+   */
+  async getMoodTrend(params?: { year?: number; month?: number }): Promise<Array<{ date: string; emoji: string }>> {
+    const response = await this.client.get('/api/progress/mood-trend', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Get mood counts
+   */
+  async getMoodCounts(params?: { year?: number; month?: number }): Promise<{ moodCounts: Record<string, number>; totalEntries: number }> {
+    const response = await this.client.get('/api/progress/mood-counts', {
+      params,
+    });
+    return response.data.data;
+  }
+
   // Settings endpoints
 
   /**
