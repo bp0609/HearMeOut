@@ -10,6 +10,7 @@ import {
 import { ActivitySelector } from '@/components/ActivitySelector';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
+import { getEmotionFromEmoji, EMOTIONS } from '@/lib/constants';
 import type { Activity, MoodEntry } from '@/types';
 
 interface ActivityEditDialogProps {
@@ -85,6 +86,11 @@ export function ActivityEditDialog({
         day: 'numeric',
     });
 
+    // Get mood color from the selected emoji
+    const moodColor = entry.selectedEmoji
+        ? EMOTIONS[getEmotionFromEmoji(entry.selectedEmoji)].color
+        : '#a855f7'; // Default purple
+
     return (
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -110,6 +116,7 @@ export function ActivityEditDialog({
                         activities={activities}
                         selectedActivities={selectedActivities}
                         onSelectionChange={setSelectedActivities}
+                        moodColor={moodColor}
                     />
 
                     <div className="mt-6 flex gap-3 justify-end">

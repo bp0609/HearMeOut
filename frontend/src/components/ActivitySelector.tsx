@@ -7,12 +7,14 @@ interface ActivitySelectorProps {
     selectedActivities: string[];
     onSelectionChange: (activityKeys: string[]) => void;
     activities: Activity[];
+    moodColor?: string; // Color from the selected mood emoji
 }
 
 export function ActivitySelector({
     selectedActivities,
     onSelectionChange,
     activities,
+    moodColor = '#a855f7', // Default to purple if no mood color provided
 }: ActivitySelectorProps) {
     const [selected, setSelected] = useState<Set<string>>(new Set(selectedActivities));
 
@@ -48,19 +50,19 @@ export function ActivitySelector({
                             'flex flex-col items-center gap-2',
                             'hover:scale-105 active:scale-95',
                             selected
-                                ? 'border-purple-500 bg-purple-50 shadow-md'
+                                ? 'shadow-md'
                                 : 'border-gray-200 bg-white hover:border-gray-300'
                         )}
                         style={{
-                            backgroundColor: selected ? `${activity.color}15` : undefined,
-                            borderColor: selected ? activity.color : undefined,
+                            backgroundColor: selected ? `${moodColor}15` : undefined,
+                            borderColor: selected ? moodColor : undefined,
                         }}
                     >
                         {/* Selection indicator */}
                         {selected && (
                             <div
                                 className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-                                style={{ backgroundColor: activity.color }}
+                                style={{ backgroundColor: moodColor }}
                             >
                                 <Check className="w-4 h-4 text-white" />
                             </div>

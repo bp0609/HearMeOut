@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Sparkles, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ActivitySelector } from '@/components/ActivitySelector';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
-import type { Activity } from '@/types';
+import { getEmotionFromEmoji, EMOTIONS } from '@/lib/constants';
+import type { Activity, MoodEntry } from '@/types';
 
 export default function ActivitySelectionPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { entryId } = useParams<{ entryId: string }>();
     const { toast } = useToast();
 
@@ -17,6 +19,10 @@ export default function ActivitySelectionPage() {
     const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+
+    // Get mood color from navigation state, or use default
+    const moodColorFromState = location.state?.moodColor;
+    const [moodColor, setMoodColor] = useState<string>(moodColorFromState || '#a855f7');
 
     // Fetch activities on mount
     useEffect(() => {
@@ -127,6 +133,7 @@ export default function ActivitySelectionPage() {
                             activities={activities}
                             selectedActivities={selectedActivities}
                             onSelectionChange={setSelectedActivities}
+                            moodColor={moodColor}
                         />
 
                         {/* Action Buttons */}

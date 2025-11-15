@@ -817,19 +817,25 @@ export default function ProgressPage() {
                                     <div className="mt-3 pt-2 border-t">
                                       <p className="text-xs font-semibold text-gray-600 mb-1">Activities:</p>
                                       <div className="flex flex-wrap gap-1">
-                                        {dayActivities.map(activity => (
-                                          <span
-                                            key={activity!.key}
-                                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs"
-                                            style={{
-                                              backgroundColor: `${activity!.color}20`,
-                                              color: activity!.color,
-                                              border: `1px solid ${activity!.color}40`
-                                            }}
-                                          >
-                                            {activity!.icon} {activity!.label}
-                                          </span>
-                                        ))}
+                                        {dayActivities.map(activity => {
+                                          // Get mood color for this day
+                                          const emotionKey = getEmotionFromEmoji(data.emoji);
+                                          const moodColor = EMOTIONS[emotionKey].color;
+
+                                          return (
+                                            <span
+                                              key={activity!.key}
+                                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs"
+                                              style={{
+                                                backgroundColor: `${moodColor}20`,
+                                                color: moodColor,
+                                                border: `1px solid ${moodColor}40`
+                                              }}
+                                            >
+                                              {activity!.icon} {activity!.label}
+                                            </span>
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}
@@ -964,118 +970,146 @@ export default function ProgressPage() {
             </Card>
 
             {/* 4. Activity-Mood Correlation Chart */}
-            {activityCorrelations.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>How Activities Affect Your Mood</CardTitle>
-                  <CardDescription>
-                    Average mood level for each activity (higher is better)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={Math.max(300, activityCorrelations.length * 40)}>
-                    <BarChart
-                      data={activityCorrelations}
-                      layout="vertical"
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 10]} />
-                      <YAxis
-                        dataKey="activityKey"
-                        type="category"
-                        width={150}
-                        tick={(props: any) => {
-                          const { x, y, payload } = props;
-                          const activity = activitiesMap.get(payload.value);
-                          if (!activity) return <g />;
+            {activityCorrelations.length > 0 && (() => {
+              // Sort activities alphabetically by name
+              const sortedActivityCorrelations = [...activityCorrelations].sort((a, b) => {
+                const activityA = activitiesMap.get(a.activityKey);
+                const activityB = activitiesMap.get(b.activityKey);
+                const labelA = activityA?.label || '';
+                const labelB = activityB?.label || '';
+                return labelA.localeCompare(labelB);
+              });
 
-                          return (
-                            <g transform={`translate(${x},${y})`}>
-                              <text
-                                x={-10}
-                                y={0}
-                                dy={4}
-                                textAnchor="end"
-                                fill="#666"
-                                fontSize="14"
-                              >
-                                <tspan fontSize="16">{activity.icon}</tspan>
-                                <tspan dx="8">{activity.label}</tspan>
-                              </text>
-                            </g>
-                          );
-                        }}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (!active || !payload || payload.length === 0) return null;
-
-                          const data = payload[0].payload;
-                          const activity = activitiesMap.get(data.activityKey);
-
-                          return (
-                            <div className="bg-white p-3 rounded-lg shadow-lg border">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-2xl">{activity?.icon}</span>
-                                <span className="font-semibold">{activity?.label}</span>
-                              </div>
-                              <div className="text-sm space-y-1">
-                                <div className="flex justify-between gap-4">
-                                  <span className="text-muted-foreground">Average Mood:</span>
-                                  <span className="font-bold">{data.averageMood.toFixed(1)}/10</span>
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                  <span className="text-muted-foreground">Entries:</span>
-                                  <span>{data.count}</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }}
-                      />
-                      <Bar
-                        dataKey="averageMood"
-                        radius={[0, 8, 8, 0]}
-                        fill="#8884d8"
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>How Activities Affect Your Mood</CardTitle>
+                    <CardDescription>
+                      Average mood level for each activity (higher is better)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={Math.max(300, sortedActivityCorrelations.length * 40)}>
+                      <BarChart
+                        data={sortedActivityCorrelations}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                       >
-                        {activityCorrelations.map((entry, index) => {
-                          const activity = activitiesMap.get(entry.activityKey);
-                          const color = activity?.color || '#8884d8';
-                          return <Cell key={`cell-${index}`} fill={color} />;
-                        })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" domain={[0, 10]} />
+                        <YAxis
+                          dataKey="activityKey"
+                          type="category"
+                          width={150}
+                          tick={(props: any) => {
+                            const { x, y, payload } = props;
+                            const activity = activitiesMap.get(payload.value);
+                            if (!activity) return <g />;
 
-                  {/* Insights */}
-                  {activityCorrelations.length > 0 && (
-                    <div className="mt-4 p-4 bg-purple-50 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <span className="text-2xl">💡</span>
-                        <div>
-                          <p className="font-semibold text-purple-900 mb-1">Insight</p>
-                          <p className="text-sm text-purple-800">
-                            {(() => {
-                              const best = activityCorrelations[0];
-                              const bestActivity = activitiesMap.get(best.activityKey);
-                              const diffValue = activityCorrelations.length > 1
-                                ? parseFloat((best.averageMood - activityCorrelations[activityCorrelations.length - 1].averageMood).toFixed(1))
-                                : 0;
+                            return (
+                              <g transform={`translate(${x},${y})`}>
+                                <text
+                                  x={-10}
+                                  y={0}
+                                  dy={4}
+                                  textAnchor="end"
+                                  fill="#666"
+                                  fontSize="14"
+                                >
+                                  <tspan fontSize="16">{activity.icon}</tspan>
+                                  <tspan dx="8">{activity.label}</tspan>
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload || payload.length === 0) return null;
 
-                              return bestActivity
-                                ? `Your mood is highest when "${bestActivity.label}" (${best.averageMood.toFixed(1)}/10). ${diffValue > 0 ? `That's ${diffValue} points higher than your lowest-rated activity!` : ''
-                                }`
-                                : 'Track more activities to see insights!';
-                            })()}
-                          </p>
+                            const data = payload[0].payload;
+                            const activity = activitiesMap.get(data.activityKey);
+
+                            // Get the emoji for the closest mood level
+                            const emotionLevel = Math.min(8, Math.max(1, Math.round(data.averageMood * 0.8)));
+                            const closestMoodEmoji = getEmotionEmojiFromLevel(emotionLevel);
+
+                            return (
+                              <div className="bg-white p-3 rounded-lg shadow-lg border">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-2xl">{activity?.icon}</span>
+                                  <span className="font-semibold">{activity?.label}</span>
+                                </div>
+                                <div className="text-sm space-y-1">
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Average Mood:</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">{closestMoodEmoji}</span>
+                                      <span className="font-bold">{data.averageMood.toFixed(1)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Entries:</span>
+                                    <span>{data.count}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }}
+                        />
+                        <Bar
+                          dataKey="averageMood"
+                          radius={[0, 8, 8, 0]}
+                          fill="#8884d8"
+                        >
+                          {sortedActivityCorrelations.map((entry, index) => {
+                            // Get emotion color based on average mood level
+                            // averageMood is on 1-10 scale, but emotion levels are 1-8
+                            // Map 1-10 to 1-8: round to nearest emotion level
+                            const emotionLevel = Math.min(8, Math.max(1, Math.round(entry.averageMood * 0.8)));
+                            const emotionKey = EMOTION_ORDER.find(key => EMOTIONS[key].level === emotionLevel);
+                            const color = emotionKey ? EMOTIONS[emotionKey].color : '#8884d8';
+                            return <Cell key={`cell-${index}`} fill={color} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    {/* Insights */}
+                    {sortedActivityCorrelations.length > 0 && (
+                      <div className="mt-4 p-4 bg-purple-50 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-2xl">💡</span>
+                          <div>
+                            <p className="font-semibold text-purple-900 mb-1">Insight</p>
+                            <p className="text-sm text-purple-800">
+                              {(() => {
+                                // Find the activity with highest and lowest mood (not alphabetically sorted)
+                                const best = sortedActivityCorrelations.reduce((max, curr) =>
+                                  curr.averageMood > max.averageMood ? curr : max
+                                );
+                                const worst = sortedActivityCorrelations.reduce((min, curr) =>
+                                  curr.averageMood < min.averageMood ? curr : min
+                                );
+                                const bestActivity = activitiesMap.get(best.activityKey);
+                                const diffValue = sortedActivityCorrelations.length > 1
+                                  ? parseFloat((best.averageMood - worst.averageMood).toFixed(1))
+                                  : 0;
+
+                                return bestActivity
+                                  ? `Your mood is highest when "${bestActivity.label}" (${best.averageMood.toFixed(1)}). ${diffValue > 0 ? `That's ${diffValue} points higher than your lowest-rated activity!` : ''
+                                  }`
+                                  : 'Track more activities to see insights!';
+                              })()}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
         )}
       </div>
