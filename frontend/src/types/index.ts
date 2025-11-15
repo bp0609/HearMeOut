@@ -11,6 +11,26 @@ export interface MoodEntry {
   entryDate: string;
   selectedEmoji: string | null;
   createdAt: string;
+  activities?: MoodEntryActivity[];
+}
+
+export interface Activity {
+  id: string;
+  key: string;
+  icon: string;
+  label: string;
+  color: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MoodEntryActivity {
+  id: string;
+  moodEntryId: string;
+  activityKey: string;
+  createdAt: string;
+  activity?: Activity; // Optional - included when fetched with details
 }
 
 export interface MoodEntryCreate {
@@ -53,6 +73,7 @@ export interface UserSettings {
 export interface CalendarDay {
   date: string;
   emoji: string | null;
+  activities?: MoodEntryActivity[];
 }
 
 export interface AudioRecording {
@@ -75,3 +96,19 @@ export interface RecordingState {
   duration: number;
   audioBlob: Blob | null;
 }
+
+// Activity Analytics types
+export interface ActivityStats {
+  activityKey: string;
+  activity: Activity | null;
+  count: number;
+  percentage: number;
+}
+
+export interface ActivityMoodCorrelation {
+  activityKey: string;
+  activity: Activity | null;
+  averageMood: number; // 1-10 scale
+  count: number;
+}
+

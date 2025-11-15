@@ -40,6 +40,25 @@ export interface MLAnalysisResponse {
   error?: string;
 }
 
+// Activity Types
+export interface Activity {
+  id: string;
+  key: string;
+  icon: string;
+  label: string;
+  color: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MoodEntryActivity {
+  id: string;
+  moodEntryId: string;
+  activityKey: string;
+  createdAt: string;
+}
+
 // API Request/Response Types
 export interface CreateMoodEntryRequest {
   language: string;
@@ -47,7 +66,8 @@ export interface CreateMoodEntryRequest {
 }
 
 export interface UpdateMoodEntryRequest {
-  selectedEmoji: string;
+  selectedEmoji?: string;
+  activityKeys?: string[]; // Array of activity keys to associate with this entry
   activityTags?: string[];
   userNotes?: string;
 }

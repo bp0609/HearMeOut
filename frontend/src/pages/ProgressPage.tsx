@@ -18,8 +18,10 @@ import {
   Pie,
 } from 'recharts';
 import { api } from '@/lib/api';
+import { useActivities } from '@/hooks/useActivities';
 import { useToast } from '@/hooks/useToast';
 import { getTodayIST } from '@/lib/utils';
+import type { ActivityMoodCorrelation } from '@/types';
 import {
   DAYS_OF_WEEK,
   MONTHS,
@@ -36,6 +38,8 @@ interface MoodTrendPoint {
   emoji: string;
   emotionLevel: number;
   emotion: string;
+  activityKeys: string[];
+  hasSelectedActivity?: boolean;
 }
 
 export default function ProgressPage() {
@@ -52,12 +56,18 @@ export default function ProgressPage() {
   const [showOverall, setShowOverall] = useState(false);
   const [tempYear, setTempYear] = useState(currentDate.getFullYear());
   const [tempMonth, setTempMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedActivityFilter, setSelectedActivityFilter] = useState<string>('all');
 
   // Data state
   const [weekdayData, setWeekdayData] = useState<Record<string, Record<string, number>>>({});
   const [moodCounts, setMoodCounts] = useState<Record<string, number>>({});
   const [totalEntries, setTotalEntries] = useState(0);
   const [trendData, setTrendData] = useState<MoodTrendPoint[]>([]);
+  const [rawTrendData, setRawTrendData] = useState<Array<{ date: string; emoji: string; activityKeys: string[] }>>([]);
+  const [activityCorrelations, setActivityCorrelations] = useState<ActivityMoodCorrelation[]>([]);
+
+  // Fetch activities for labels
+  const { activitiesMap } = useActivities();
 
   // Check if user has checked in today
   useEffect(() => {
@@ -85,24 +95,21 @@ export default function ProgressPage() {
 
         const params = showOverall ? {} : { year: selectedYear, month: selectedMonth };
 
-        // Fetch all three data sets
-        const [weekday, counts, trend] = await Promise.all([
+        // Fetch all data sets including activity correlations
+        const [weekday, counts, trend, activityData] = await Promise.all([
           api.getWeekdayDistribution(params),
           api.getMoodCounts(params),
           api.getMoodTrend(params),
+          api.getActivityMoodCorrelation(params),
         ]);
 
         setWeekdayData(weekday);
         setMoodCounts(counts.moodCounts);
         setTotalEntries(counts.totalEntries);
+        setActivityCorrelations(activityData.correlations);
 
-        // Transform trend data with emotion levels
-        const transformedTrend = trend.map(point => ({
-          ...point,
-          emotionLevel: getEmotionLevel(point.emoji),
-          emotion: getEmotionLabel(point.emoji),
-        }));
-        setTrendData(transformedTrend);
+        // Store raw trend data for filtering
+        setRawTrendData(trend);
       } catch (error) {
         console.error('Error fetching progress data:', error);
         toast({
@@ -117,6 +124,17 @@ export default function ProgressPage() {
 
     fetchData();
   }, [selectedYear, selectedMonth, showOverall, toast]);
+
+  // Transform trend data when raw data or activity filter changes (no loading state)
+  useEffect(() => {
+    const transformedTrend = rawTrendData.map(point => ({
+      ...point,
+      emotionLevel: getEmotionLevel(point.emoji),
+      emotion: getEmotionLabel(point.emoji),
+      hasSelectedActivity: selectedActivityFilter === 'all' || point.activityKeys.includes(selectedActivityFilter),
+    }));
+    setTrendData(transformedTrend);
+  }, [rawTrendData, selectedActivityFilter]);
 
   const handleApplyFilter = () => {
     setSelectedYear(tempYear);
@@ -640,15 +658,51 @@ export default function ProgressPage() {
             {/* 3. Mood Trend Line Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Mood Trend Over Time</CardTitle>
-                <CardDescription>
-                  Track how your emotions change day by day
-                  {trendData.length > 60 && (
-                    <span className="block mt-1 text-xs">
-                      📊 Scroll horizontally to view all {trendData.length} entries
-                    </span>
-                  )}
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <CardTitle>Mood Trend Over Time</CardTitle>
+                    <CardDescription>
+                      Track how your emotions change day by day
+                      {selectedActivityFilter !== 'all' && (
+                        <span className="block mt-1 text-purple-600 font-medium">
+                          🎯 Highlighting days with: {activitiesMap.get(selectedActivityFilter)?.icon} {activitiesMap.get(selectedActivityFilter)?.label}
+                        </span>
+                      )}
+                      {trendData.length > 60 && (
+                        <span className="block mt-1 text-xs">
+                          📊 Scroll horizontally to view all {trendData.length} entries
+                        </span>
+                      )}
+                    </CardDescription>
+                  </div>
+
+                  {/* Activity Filter Dropdown */}
+                  <div className="flex flex-col items-end gap-2">
+                    <label className="text-sm font-medium text-gray-700">Filter by Activity:</label>
+                    <select
+                      value={selectedActivityFilter}
+                      onChange={(e) => setSelectedActivityFilter(e.target.value)}
+                      className="
+                        min-w-[200px] px-3 py-2 text-sm font-medium
+                        border-2 border-gray-200 rounded-lg
+                        bg-white hover:bg-gray-50
+                        focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent
+                        transition-all duration-200 cursor-pointer
+                      "
+                    >
+                      <option value="all">🗓️ All Days</option>
+                      <optgroup label="Activities">
+                        {Array.from(activitiesMap.values())
+                          .sort((a, b) => a.order - b.order)
+                          .map(activity => (
+                            <option key={activity.key} value={activity.key}>
+                              {activity.icon} {activity.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {/* Scrollable container for large datasets */}
@@ -742,6 +796,12 @@ export default function ProgressPage() {
                               const data = payload[0].payload as MoodTrendPoint;
                               const d = new Date(data.date);
                               const formattedDate = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+
+                              // Get activities for this day
+                              const dayActivities = data.activityKeys
+                                .map(key => activitiesMap.get(key))
+                                .filter(Boolean);
+
                               return (
                                 <div className="bg-white p-3 border rounded shadow-lg">
                                   <p className="text-sm text-gray-600">{formattedDate}</p>
@@ -752,6 +812,27 @@ export default function ProgressPage() {
                                   <p className="text-xs text-gray-500 mt-1 text-center">
                                     Level: {data.emotionLevel}
                                   </p>
+
+                                  {dayActivities.length > 0 && (
+                                    <div className="mt-3 pt-2 border-t">
+                                      <p className="text-xs font-semibold text-gray-600 mb-1">Activities:</p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {dayActivities.map(activity => (
+                                          <span
+                                            key={activity!.key}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs"
+                                            style={{
+                                              backgroundColor: `${activity!.color}20`,
+                                              color: activity!.color,
+                                              border: `1px solid ${activity!.color}40`
+                                            }}
+                                          >
+                                            {activity!.icon} {activity!.label}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             }
@@ -771,6 +852,62 @@ export default function ProgressPage() {
                             const emotionKey = getEmotionFromEmoji(payload.emoji);
                             const color = EMOTIONS[emotionKey].color;
 
+                            // Check if this point has the selected activity
+                            const hasActivity = payload.hasSelectedActivity;
+                            const isFiltered = selectedActivityFilter !== 'all';
+
+                            // If filtering and this point has the activity, make it larger and add a ring
+                            if (isFiltered && hasActivity) {
+                              return (
+                                <g key={`dot-group-${index}`}>
+                                  {/* Outer glow ring */}
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={12}
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth={3}
+                                    opacity={0.3}
+                                  />
+                                  {/* Main dot */}
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={8}
+                                    fill={color}
+                                    stroke="#fff"
+                                    strokeWidth={3}
+                                  />
+                                  {/* Inner highlight */}
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={3}
+                                    fill="#fff"
+                                    opacity={0.7}
+                                  />
+                                </g>
+                              );
+                            }
+
+                            // If filtering and this point doesn't have the activity, make it smaller and dimmed
+                            if (isFiltered && !hasActivity) {
+                              return (
+                                <circle
+                                  key={`dot-${index}`}
+                                  cx={cx}
+                                  cy={cy}
+                                  r={4}
+                                  fill={color}
+                                  stroke="#fff"
+                                  strokeWidth={1}
+                                  opacity={0.3}
+                                />
+                              );
+                            }
+
+                            // Default: normal dot
                             return (
                               <circle
                                 key={`dot-${index}`}
@@ -825,6 +962,120 @@ export default function ProgressPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* 4. Activity-Mood Correlation Chart */}
+            {activityCorrelations.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>How Activities Affect Your Mood</CardTitle>
+                  <CardDescription>
+                    Average mood level for each activity (higher is better)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={Math.max(300, activityCorrelations.length * 40)}>
+                    <BarChart
+                      data={activityCorrelations}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" domain={[0, 10]} />
+                      <YAxis
+                        dataKey="activityKey"
+                        type="category"
+                        width={150}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props;
+                          const activity = activitiesMap.get(payload.value);
+                          if (!activity) return <g />;
+
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text
+                                x={-10}
+                                y={0}
+                                dy={4}
+                                textAnchor="end"
+                                fill="#666"
+                                fontSize="14"
+                              >
+                                <tspan fontSize="16">{activity.icon}</tspan>
+                                <tspan dx="8">{activity.label}</tspan>
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+
+                          const data = payload[0].payload;
+                          const activity = activitiesMap.get(data.activityKey);
+
+                          return (
+                            <div className="bg-white p-3 rounded-lg shadow-lg border">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-2xl">{activity?.icon}</span>
+                                <span className="font-semibold">{activity?.label}</span>
+                              </div>
+                              <div className="text-sm space-y-1">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Average Mood:</span>
+                                  <span className="font-bold">{data.averageMood.toFixed(1)}/10</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Entries:</span>
+                                  <span>{data.count}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar
+                        dataKey="averageMood"
+                        radius={[0, 8, 8, 0]}
+                        fill="#8884d8"
+                      >
+                        {activityCorrelations.map((entry, index) => {
+                          const activity = activitiesMap.get(entry.activityKey);
+                          const color = activity?.color || '#8884d8';
+                          return <Cell key={`cell-${index}`} fill={color} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {/* Insights */}
+                  {activityCorrelations.length > 0 && (
+                    <div className="mt-4 p-4 bg-purple-50 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <span className="text-2xl">💡</span>
+                        <div>
+                          <p className="font-semibold text-purple-900 mb-1">Insight</p>
+                          <p className="text-sm text-purple-800">
+                            {(() => {
+                              const best = activityCorrelations[0];
+                              const bestActivity = activitiesMap.get(best.activityKey);
+                              const diffValue = activityCorrelations.length > 1
+                                ? parseFloat((best.averageMood - activityCorrelations[activityCorrelations.length - 1].averageMood).toFixed(1))
+                                : 0;
+
+                              return bestActivity
+                                ? `Your mood is highest when "${bestActivity.label}" (${best.averageMood.toFixed(1)}/10). ${diffValue > 0 ? `That's ${diffValue} points higher than your lowest-rated activity!` : ''
+                                }`
+                                : 'Track more activities to see insights!';
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
