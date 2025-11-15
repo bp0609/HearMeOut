@@ -73,29 +73,3 @@ export function deleteAudioFile(filePath: string): void {
     console.error(`Error deleting audio file ${filePath}:`, error);
   }
 }
-
-/**
- * Cleans up old files in temp directory (older than 1 hour)
- * Run this periodically to prevent disk space issues
- */
-export function cleanupOldAudioFiles(): void {
-  try {
-    const files = fs.readdirSync(TEMP_AUDIO_DIR);
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-
-    files.forEach(file => {
-      const filePath = path.join(TEMP_AUDIO_DIR, file);
-      const stats = fs.statSync(filePath);
-
-      if (stats.mtimeMs < oneHourAgo) {
-        fs.unlinkSync(filePath);
-        console.log(`Cleaned up old audio file: ${file}`);
-      }
-    });
-  } catch (error) {
-    console.error('Error cleaning up audio files:', error);
-  }
-}
-
-// Run cleanup every 30 minutes
-setInterval(cleanupOldAudioFiles, 30 * 60 * 1000);
