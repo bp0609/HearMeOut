@@ -42,8 +42,8 @@ export const MONTHS = [
 
 // 8 Emotion categories (matching ML service emotions)
 export const EMOTIONS = {
-  happy: { label: 'Happy', emoji: '😊', level: 8, color: '#10b981' },
-  excited: { label: 'Excited', emoji: '🤗', level: 7, color: '#84cc16' },
+  happy: { label: 'Happy', emoji: '😊', level: 7, color: '#10b981' },
+  excited: { label: 'Excited', emoji: '🤗', level: 8, color: '#84cc16' },
   neutral: { label: 'Neutral', emoji: '😐', level: 6, color: '#fbbf24' },
   calm: { label: 'Calm', emoji: '😌', level: 5, color: '#06b6d4' },
   sad: { label: 'Sad', emoji: '😢', level: 4, color: '#f97316' },
@@ -55,7 +55,7 @@ export const EMOTIONS = {
 export type EmotionKey = keyof typeof EMOTIONS;
 
 // Emotion order for charts (best to worst)
-export const EMOTION_ORDER: EmotionKey[] = ['happy', 'excited', 'calm', 'neutral', 'sad', 'angry', 'fearful', 'disgusted'];
+export const EMOTION_ORDER: EmotionKey[] = ['excited', 'happy', 'calm', 'neutral', 'sad', 'angry', 'fearful', 'disgusted'];
 
 // Map emoji to emotion category
 export const getEmotionFromEmoji = (emoji: string): EmotionKey => {

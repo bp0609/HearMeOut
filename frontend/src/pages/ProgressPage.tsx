@@ -191,13 +191,15 @@ export default function ProgressPage() {
   });
 
   // Prepare mood count gauge data
-  const moodCountData = Object.entries(moodCounts).map(([emoji, count]) => ({
-    emoji,
-    count,
-    emotion: getEmotionLabel(emoji),
-    emotionKey: getEmotionFromEmoji(emoji),
-    percentage: totalEntries > 0 ? Math.round((count / totalEntries) * 100) : 0,
-  }));
+  const moodCountData = Object.entries(moodCounts)
+    .map(([emoji, count]) => ({
+      emoji,
+      count,
+      emotion: getEmotionLabel(emoji),
+      emotionKey: getEmotionFromEmoji(emoji),
+      percentage: totalEntries > 0 ? Math.round((count / totalEntries) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count); // Sort by count descending
 
   // Group by emotion category for gauge segments
   const emotionData = moodCountData.reduce((acc, item) => {
@@ -221,6 +223,9 @@ export default function ProgressPage() {
   emotionData.forEach(emotion => {
     emotion.percentage = totalEntries > 0 ? Math.round((emotion.count / totalEntries) * 100) : 0;
   });
+
+  // Sort emotion data by count (descending) to find dominant emotion
+  emotionData.sort((a, b) => b.count - a.count);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4 md:p-8">
@@ -401,12 +406,44 @@ export default function ProgressPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="day" />
                       <YAxis
-                        label={{ value: 'Average Emotion Level', angle: -90, position: 'insideLeft' }}
+                        label={{ value: 'Emotion Level', angle: -90, position: 'insideLeft' }}
                         domain={[0, 9]}
                         ticks={[1, 2, 3, 4, 5, 6, 7, 8]}
-                        tickFormatter={(value) => {
-                          const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === value);
-                          return emotion ? EMOTIONS[emotion].emoji : '';
+                        width={70}
+                        tick={({ x, y, payload }) => {
+                          const emoji = getEmotionEmojiFromLevel(payload.value);
+                          const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === payload.value);
+                          const label = emotion ? EMOTIONS[emotion].label : '';
+
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              {/* Level number - positioned to the left */}
+                              <text
+                                x={-30}
+                                y={0}
+                                dy={4}
+                                textAnchor="middle"
+                                fill="#999"
+                                fontSize="11"
+                                fontWeight="bold"
+                              >
+                                {payload.value}
+                              </text>
+                              {/* Emoji - positioned to the right of the number */}
+                              <text
+                                x={-10}
+                                y={0}
+                                dy={4}
+                                textAnchor="middle"
+                                fill="#666"
+                                fontSize="20"
+                              >
+                                {emoji}
+                              </text>
+                              {/* Tooltip on hover */}
+                              <title>{`Level ${payload.value}: ${label}`}</title>
+                            </g>
+                          );
                         }}
                       />
                       <Tooltip
@@ -426,17 +463,21 @@ export default function ProgressPage() {
                                     </div>
                                     <div className="space-y-1">
                                       <p className="text-xs font-semibold text-gray-700 mb-1">Mood breakdown:</p>
-                                      {data.emojiBreakdown.map((item: any, idx: number) => (
-                                        <div key={idx} className="flex items-center justify-between text-sm">
-                                          <span>
-                                            <span className="text-lg mr-2">{item.emoji}</span>
-                                            {item.emotion}
-                                          </span>
-                                          <span className="text-gray-600">
-                                            {item.count} ({item.percentage}%)
-                                          </span>
-                                        </div>
-                                      ))}
+                                      {data.emojiBreakdown.map((item: any, idx: number) => {
+                                        const level = getEmotionLevel(item.emoji);
+                                        return (
+                                          <div key={idx} className="flex items-center justify-between text-sm">
+                                            <span>
+                                              <span className="text-lg mr-2">{item.emoji}</span>
+                                              {item.emotion}
+                                              <span className="text-xs text-gray-400 ml-1">(L{level})</span>
+                                            </span>
+                                            <span className="text-gray-600">
+                                              {item.count} ({item.percentage}%)
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </>
                                 ) : (
@@ -527,10 +568,10 @@ export default function ProgressPage() {
                               const data = payload[0].payload;
                               return (
                                 <div
-                                  className="bg-white p-3 border-2 rounded-lg shadow-xl z-50"
+                                  className="bg-white p-3 border-2 rounded-lg shadow-xl"
                                   style={{
                                     borderColor: data.color,
-                                    backgroundColor: `${data.color}10`
+                                    zIndex: 9999,
                                   }}
                                 >
                                   <div className="flex items-center gap-2 mb-1">
@@ -552,8 +593,8 @@ export default function ProgressPage() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Center label showing total - with z-index to stay below tooltips */}
-                  <div className="absolute left-1/2 top-[55%] transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none z-0">
+                  {/* Center label showing total - positioned at the base of the pie chart */}
+                  <div className="absolute left-1/2 top-[60%] transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none z-0">
                     <div className="text-4xl font-bold text-gray-800">{totalEntries}</div>
                     <div className="text-sm text-gray-500 font-medium">Total Entries</div>
                   </div>
@@ -652,10 +693,42 @@ export default function ProgressPage() {
                         <YAxis
                           domain={[0, 9]}
                           ticks={[1, 2, 3, 4, 5, 6, 7, 8]}
-                          tickFormatter={(value) => {
-                            return getEmotionEmojiFromLevel(value);
+                          width={70}
+                          tick={({ x, y, payload }) => {
+                            const emoji = getEmotionEmojiFromLevel(payload.value);
+                            const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === payload.value);
+                            const label = emotion ? EMOTIONS[emotion].label : '';
+
+                            return (
+                              <g transform={`translate(${x},${y})`}>
+                                {/* Level number - positioned to the left */}
+                                <text
+                                  x={-30}
+                                  y={0}
+                                  dy={4}
+                                  textAnchor="middle"
+                                  fill="#999"
+                                  fontSize="11"
+                                  fontWeight="bold"
+                                >
+                                  {payload.value}
+                                </text>
+                                {/* Emoji - positioned to the right of the number */}
+                                <text
+                                  x={-10}
+                                  y={0}
+                                  dy={4}
+                                  textAnchor="middle"
+                                  fill="#666"
+                                  fontSize="18"
+                                >
+                                  {emoji}
+                                </text>
+                                {/* Tooltip on hover */}
+                                <title>{`Level ${payload.value}: ${label}`}</title>
+                              </g>
+                            );
                           }}
-                          width={40}
                           label={{
                             value: 'Emotions',
                             angle: -90,
@@ -676,6 +749,9 @@ export default function ProgressPage() {
                                   <p className="text-sm font-medium">
                                     {data.emotion}
                                   </p>
+                                  <p className="text-xs text-gray-500 mt-1 text-center">
+                                    Level: {data.emotionLevel}
+                                  </p>
                                 </div>
                               );
                             }
@@ -685,32 +761,48 @@ export default function ProgressPage() {
                         <Line
                           type="monotone"
                           dataKey="emotionLevel"
-                          stroke="#8b5cf6"
+                          stroke="#9ca3af"
                           strokeWidth={2}
                           dot={(props: any) => {
                             const { cx, cy, payload, index } = props;
-                            if (!payload || !cx || !cy) return <circle cx={cx} cy={cy} r={0} />;
+                            if (!payload || !cx || !cy) return <circle key={`dot-empty-${index}`} cx={0} cy={0} r={0} />;
 
-                            // For large datasets, show fewer emojis (every nth point)
-                            const showInterval = trendData.length > 180 ? 7 : trendData.length > 90 ? 4 : trendData.length > 60 ? 2 : 1;
+                            // Get the emotion color based on the emoji
+                            const emotionKey = getEmotionFromEmoji(payload.emoji);
+                            const color = EMOTIONS[emotionKey].color;
 
-                            if (index % showInterval === 0 || trendData.length <= 60) {
-                              return (
-                                <text
-                                  x={cx}
-                                  y={cy}
-                                  textAnchor="middle"
-                                  dominantBaseline="middle"
-                                  fontSize={trendData.length > 90 ? "16" : "20"}
-                                >
-                                  {payload.emoji}
-                                </text>
-                              );
-                            }
-                            // Show small dot for points without emoji
-                            return <circle cx={cx} cy={cy} r={3} fill="#8b5cf6" />;
+                            return (
+                              <circle
+                                key={`dot-${index}`}
+                                cx={cx}
+                                cy={cy}
+                                r={6}
+                                fill={color}
+                                stroke="#fff"
+                                strokeWidth={2}
+                              />
+                            );
                           }}
-                          activeDot={{ r: 8 }}
+                          activeDot={(props: any) => {
+                            const { cx, cy, payload, index } = props;
+                            if (!payload || !cx || !cy) return <circle key={`active-empty-${index}`} cx={0} cy={0} r={0} />;
+
+                            // Get the emotion color based on the emoji
+                            const emotionKey = getEmotionFromEmoji(payload.emoji);
+                            const color = EMOTIONS[emotionKey].color;
+
+                            return (
+                              <circle
+                                key={`active-${index}`}
+                                cx={cx}
+                                cy={cy}
+                                r={10}
+                                fill={color}
+                                stroke="#fff"
+                                strokeWidth={2}
+                              />
+                            );
+                          }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -731,28 +823,6 @@ export default function ProgressPage() {
                     })()}
                   </div>
                 )}
-
-                {/* Legend with emotion scale */}
-                <div className="mt-6 pt-6 border-t">
-                  <h4 className="font-semibold mb-3 text-center">Emotion Scale</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
-                    {EMOTION_ORDER.map(key => {
-                      const emotion = EMOTIONS[key];
-                      return (
-                        <div key={key} className="flex items-center gap-2 p-2 rounded bg-gray-50">
-                          <span className="text-2xl">{emotion.emoji}</span>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium">{emotion.label}</div>
-                            <div
-                              className="w-full h-1 rounded mt-1"
-                              style={{ backgroundColor: emotion.color }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>

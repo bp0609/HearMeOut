@@ -299,6 +299,16 @@ class ApiClient {
     await this.client.delete(`/api/audio/recordings/${entryId}`);
   }
 
+  /**
+   * Fetch audio blob for playback with authentication
+   */
+  async getAudioBlob(entryId: string): Promise<Blob> {
+    const response = await this.client.get(`/api/audio/recordings/${entryId}/play`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // Health check
 
   /**
