@@ -82,6 +82,13 @@ Predict emotion from an audio file.
 
 ## Running the Service
 
+### Initial Step
+
+Download the model from given OneDrive Link and extract the .zip file in `ml-service/` folder.
+
+[OneDrive Link](https://iitgnacin-my.sharepoint.com/:u:/g/personal/22110098_iitgn_ac_in1/ERKzT030GVdHo8w0YrRFEvABpVxMuRPxxTZjXlU1SLsi7w?e=ppMZGc)
+
+
 ### Development
 ```bash
 python app.py
