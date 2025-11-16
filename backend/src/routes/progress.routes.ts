@@ -118,6 +118,7 @@ router.get(
       detectedAt: alert.detectedAt.toISOString(),
       message: getAlertMessage(alert.alertType, alert.patternDetails as any),
       suggestions: getAlertSuggestions(alert.alertType),
+      patternDetails: alert.patternDetails,
     }));
 
     res.json({

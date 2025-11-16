@@ -35,7 +35,7 @@ model MoodEntry {
   // Audio metadata
   audioFilePath String? // Relative path to stored audio file (nullable when deleted)
   duration      Int // Duration in seconds
-  language      String @default("en")
+  language      String  @default("en")
 
   // User's selected emoji (null until user selects)
   selectedEmoji String? // User's final choice from 8 emotions
@@ -43,8 +43,9 @@ model MoodEntry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activities MoodEntryActivity[]
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities      MoodEntryActivity[]
+  triggeredAlerts PatternAlert[] // Alerts that were triggered by this mood entry
 
   @@unique([userId, entryDate])
   @@index([userId, entryDate(sort: Desc)])
@@ -53,18 +54,21 @@ model MoodEntry {
 
 // Pattern Alerts - triggered by detection algorithm
 model PatternAlert {
-  id             String    @id @default(uuid())
-  userId         String
-  alertType      String // consecutive_low, sudden_drop, etc.
-  detectedAt     DateTime  @default(now())
-  patternDetails Json // Metadata about the detected pattern
-  dismissed      Boolean   @default(false)
-  dismissedAt    DateTime?
+  id                 String    @id @default(uuid())
+  userId             String
+  triggeredByEntryId String // The mood entry that triggered this alert
+  alertType          String // consecutive_low, sudden_drop, etc.
+  detectedAt         DateTime  @default(now())
+  patternDetails     Json // Metadata about the detected pattern
+  dismissed          Boolean   @default(false)
+  dismissedAt        DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  triggeredByEntry MoodEntry @relation(fields: [triggeredByEntryId], references: [id], onDelete: Cascade)
 
   @@index([userId, dismissed])
   @@index([userId, detectedAt(sort: Desc)])
+  @@index([triggeredByEntryId])
 }
 
 // User Settings - preferences and privacy controls
