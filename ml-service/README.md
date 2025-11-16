@@ -1,13 +1,21 @@
 # ML Service - Speech Emotion Recognition
 
-This service provides emotion detection from audio files using a pre-trained Wav2Vec2 model.
+Flask API for emotion detection from audio files using a pre-trained Wav2Vec2 model.
+
+## Prerequisites
+
+Ensure the pre-trained model files exist in `wav2vec2-lg-xlsr-en-speech-emotion-recognition/`:
+- `config.json`
+- `model.safetensors`
+- `preprocessor_config.json`
 
 ## API Endpoints
 
-### `GET /`
-Health check endpoint to verify the service is running.
+### Health Check
 
-**Response:**
+**Endpoint:** `GET /`
+
+**Response:** `200 OK`
 ```json
 {
   "status": "healthy",
@@ -19,8 +27,14 @@ Health check endpoint to verify the service is running.
 }
 ```
 
-### `POST /predict`
-Predict emotion from an audio file.
+### Predict Emotion
+
+**Endpoint:** `POST /predict`
+
+**Request Headers:**
+```
+Content-Type: application/json
+```
 
 **Request Body:**
 ```json
@@ -29,7 +43,7 @@ Predict emotion from an audio file.
 }
 ```
 
-**Response:**
+**Success Response:** `200 OK`
 ```json
 {
   "success": true,
@@ -54,7 +68,17 @@ Predict emotion from an audio file.
 }
 ```
 
-**Error Response:**
+**Error Responses:**
+
+`400 Bad Request` - Missing or invalid parameters
+```json
+{
+  "success": false,
+  "error": "Missing \"audio_path\" in request body"
+}
+```
+
+`404 Not Found` - Audio file doesn't exist
 ```json
 {
   "success": false,
@@ -62,23 +86,24 @@ Predict emotion from an audio file.
 }
 ```
 
+`500 Internal Server Error` - Processing error
+```json
+{
+  "success": false,
+  "error": "Error message here"
+}
+```
+
 ## Supported Emotions
 
-- **angry**: Anger, frustration
-- **calm**: Calmness, peace
-- **disgust**: Disgust, disapproval
-- **fearful**: Fear, anxiety
-- **happy**: Happiness, joy
-- **neutral**: Neutral state
-- **sad**: Sadness, sorrow
-- **surprised**: Surprise, shock
+`angry` | `calm` | `disgust` | `fearful` | `happy` | `neutral` | `sad` | `surprised`
 
-## Model Information
+## Model Details
 
-- **Model**: wav2vec2-lg-xlsr-en-speech-emotion-recognition
-- **Input**: Audio files (WAV, MP3, WebM, OGG)
-- **Sampling Rate**: 16kHz
-- **Framework**: PyTorch + Transformers
+- **Model:** wav2vec2-lg-xlsr-en-speech-emotion-recognition
+- **Supported Formats:** WAV, MP3, WebM, OGG
+- **Sampling Rate:** 16kHz
+- **Framework:** PyTorch + Transformers
 
 ## Running the Service
 
@@ -98,15 +123,26 @@ python app.py
 ```bash
 docker-compose up ml-service
 ```
+Service runs at `http://localhost:8000`
 
-The service will be available at `http://localhost:8000`
+### Development
+```bash
+pip install -r requirements.txt
+python app.py
+```
 
-## Environment Variables
+## Backend Integration
 
-- `FLASK_HOST`: Host to bind to (default: 0.0.0.0)
-- `FLASK_PORT`: Port to run on (default: 8000)
-- `FLASK_DEBUG`: Debug mode (default: False)
+- **Service URL (Docker):** `http://ml-service:8000`
+- **Environment Variable:** `ML_SERVICE_URL` (default: `http://ml-service:8000`)
+- **Shared Volume:** `/app/temp_audio` ↔ `./backend/temp_audio`
 
-## Volume Mounts
+Backend converts local file paths to container paths before sending requests.
 
-The service uses a shared volume with the backend at `/app/temp_audio` to access audio files.
+## Testing
+
+```bash
+python ml-service/test_api.py
+```
+
+Tests health check, predictions, and error handling.

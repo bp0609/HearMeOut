@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Database, Trash2, Calendar, Clock, Globe } from 'lucide-react';
+import { ArrowLeft, Database, Trash2, Calendar, Clock, Globe, Play, Pause, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
@@ -17,10 +17,26 @@ export default function DataHistoryPage() {
     const [deleting, setDeleting] = useState<string | null>(null);
     const [audioStorageEnabled, setAudioStorageEnabled] = useState(true);
     const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
+    const [playingId, setPlayingId] = useState<string | null>(null);
+    const [audioProgress, setAudioProgress] = useState<{ [key: string]: number }>({});
+
+    const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
 
     useEffect(() => {
         fetchRecordings();
         checkTodayEntry();
+    }, []);
+
+    // Cleanup audio elements on unmount
+    useEffect(() => {
+        return () => {
+            Object.values(audioRefs.current).forEach(audio => {
+                audio.pause();
+                if (audio.src) {
+                    URL.revokeObjectURL(audio.src);
+                }
+            });
+        };
     }, []);
 
     const fetchRecordings = async () => {
@@ -110,6 +126,85 @@ export default function DataHistoryPage() {
             gu: 'Gujarati',
         };
         return languages[code] || code;
+    };
+
+    const handlePlayPause = async (recording: AudioRecording) => {
+        const recordingId = recording.id;
+
+        // If this audio is already playing, pause it
+        if (playingId === recordingId) {
+            const audio = audioRefs.current[recordingId];
+            if (audio) {
+                audio.pause();
+                setPlayingId(null);
+            }
+            return;
+        }
+
+        // Pause any currently playing audio
+        if (playingId) {
+            const currentAudio = audioRefs.current[playingId];
+            if (currentAudio) {
+                currentAudio.pause();
+            }
+        }
+
+        // Create or get audio element
+        if (!audioRefs.current[recordingId]) {
+            try {
+                // Fetch audio blob with authentication
+                const audioBlob = await api.getAudioBlob(recordingId);
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                // Add event listeners
+                audio.addEventListener('timeupdate', () => {
+                    setAudioProgress((prev) => ({
+                        ...prev,
+                        [recordingId]: (audio.currentTime / audio.duration) * 100,
+                    }));
+                });
+
+                audio.addEventListener('ended', () => {
+                    setPlayingId(null);
+                    setAudioProgress((prev) => ({ ...prev, [recordingId]: 0 }));
+                });
+
+                audio.addEventListener('error', (e) => {
+                    console.error('Audio playback error:', e);
+                    toast({
+                        title: 'Playback Error',
+                        description: 'Failed to play audio file',
+                        variant: 'destructive',
+                    });
+                    setPlayingId(null);
+                });
+
+                audioRefs.current[recordingId] = audio;
+            } catch (error) {
+                console.error('Failed to load audio:', error);
+                toast({
+                    title: 'Loading Error',
+                    description: 'Failed to load audio file',
+                    variant: 'destructive',
+                });
+                return;
+            }
+        }
+
+        // Play the audio
+        const audio = audioRefs.current[recordingId];
+        try {
+            await audio.play();
+            setPlayingId(recordingId);
+        } catch (error) {
+            console.error('Failed to play audio:', error);
+            toast({
+                title: 'Playback Error',
+                description: 'Failed to play audio file',
+                variant: 'destructive',
+            });
+        }
     };
 
     if (loading) {
@@ -216,6 +311,41 @@ export default function DataHistoryPage() {
                                                         </span>
                                                     </div>
                                                 </div>
+                                            </div>
+
+                                            {/* Audio Playback Controls */}
+                                            <div className="flex items-center gap-3 pt-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handlePlayPause(recording)}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    {playingId === recording.id ? (
+                                                        <>
+                                                            <Pause className="h-4 w-4" />
+                                                            Pause
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Play className="h-4 w-4" />
+                                                            Play
+                                                        </>
+                                                    )}
+                                                </Button>
+
+                                                {/* Progress Bar */}
+                                                {audioProgress[recording.id] !== undefined && (
+                                                    <div className="flex-1 flex items-center gap-2">
+                                                        <Volume2 className="h-4 w-4 text-muted-foreground" />
+                                                        <div className="flex-1 bg-muted rounded-full h-2">
+                                                            <div
+                                                                className="bg-primary h-2 rounded-full transition-all duration-200"
+                                                                style={{ width: `${audioProgress[recording.id] || 0}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 

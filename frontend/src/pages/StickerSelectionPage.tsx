@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/lib/utils';
+import { getEmotionFromEmoji, EMOTIONS } from '@/lib/constants';
 import type { EmotionScoreWithEmoji } from '@/types';
 
 export default function StickerSelectionPage() {
@@ -45,10 +46,17 @@ export default function StickerSelectionPage() {
 
       toast({
         title: 'Mood saved!',
-        description: 'Your daily check-in is complete',
+        description: 'Now tell us about your activities',
       });
 
-      navigate('/');
+      // Get mood color from the selected emoji
+      const emotionKey = getEmotionFromEmoji(selectedEmoji);
+      const moodColor = EMOTIONS[emotionKey].color;
+
+      // Navigate to activity selection page with mood color
+      navigate(`/select-activities/${entryId}`, {
+        state: { moodColor, selectedEmoji },
+      });
     } catch (error) {
       console.error('Error saving mood:', error);
       toast({

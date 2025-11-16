@@ -1,367 +1,199 @@
 # HearMeOut - Setup Guide
 
-## Quick Setup (5 minutes)
+## Prerequisites
 
-### 1. Prerequisites
+- **Node.js** 18+ and npm
+- **Python** 3.10+
+- **Docker** and Docker Compose
+- **Clerk** account (free at [clerk.com](https://clerk.com))
 
-- Node.js 18+ and npm
-- Python 3.10+
-- Docker and Docker Compose
-- Clerk account (free)
+## Quick Start
 
-### 2. Get Clerk API Keys
+### 1. Get Clerk API Keys
 
-1. Go to [clerk.com](https://clerk.com) and create a free account
+1. Sign up at [clerk.com](https://clerk.com)
 2. Create a new application
-3. Copy your keys from the API Keys page:
+3. Copy from API Keys page:
    - **Publishable Key**: `pk_test_...`
    - **Secret Key**: `sk_test_...`
 
-### 3. Configure Environment Variables
+### 2. Configure Environment
 
+**Backend** (`backend/.env`):
 ```bash
-# Backend
+DATABASE_URL="postgresql://admin:devpassword@localhost:5432/mood_journal"
+CLERK_SECRET_KEY="sk_test_your_secret_key_here"
+ML_SERVICE_URL="http://ml-service:8000"
+PORT=5001
+```
+
+**Frontend** (`frontend/.env`):
+```bash
+VITE_CLERK_PUBLISHABLE_KEY="pk_test_your_publishable_key_here"
+VITE_API_URL="http://localhost:5001"
+```
+
+### 3. Install & Start
+
+**Option A: Using Makefile (Recommended)**
+```bash
+make install        # Install all dependencies
+make docker-up      # Start PostgreSQL + ML Service
+make db-migrate     # Run database migrations
+```
+
+Then in separate terminals:
+```bash
+cd backend && npm run dev
+cd frontend && npm run dev
+```
+
+**Option B: Manual Setup**
+```bash
+# Install dependencies
+cd backend && npm install
+cd ../frontend && npm install
+
+# Start Docker services
+docker-compose up -d
+
+# Setup database
 cd backend
-cp .env.example .env
-# Edit .env and add:
-# CLERK_SECRET_KEY="sk_test_your_key_here"
+npx prisma migrate dev
+npx prisma generate
 
-# Frontend
-cd ../frontend
-cp .env.example .env
-# Edit .env and add:
-# VITE_CLERK_PUBLISHABLE_KEY="pk_test_your_key_here"
+# Start services (in separate terminals)
+npm run dev          # Backend
+cd ../frontend && npm run dev  # Frontend
 ```
 
-### 4. Install Dependencies
-
-```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-
-# ML Service (in Docker - will install automatically)
-```
-
-### 5. Start Services
-
-**Terminal 1 - Docker Services (PostgreSQL + ML Service):**
-
-```bash
-docker-compose up
-```
-
-Wait for "ML Service initialized successfully!" message (1-2 minutes on first run).
-
-**Terminal 2 - Backend:**
-
-```bash
-cd backend
-npx prisma migrate dev  # Run migrations
-npm run dev
-```
-
-**Terminal 3 - Frontend:**
-
-```bash
-cd frontend
-npm run dev
-```
-
-### 6. Access Application
+### 4. Access Application
 
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:5001
 - **ML Service**: http://localhost:8000
 
-## Detailed Setup Instructions
-
-### Database Setup
-
-The PostgreSQL database runs in Docker. On first run:
-
-```bash
-cd backend
-
-# Generate Prisma client
-npx prisma generate
-
-# Run migrations
-npx prisma migrate dev
-
-# (Optional) Open Prisma Studio to view database
-npx prisma studio
-```
-
-### ML Service Setup
-
-The ML service automatically downloads required models on first startup:
-
-- **Emotion Model**: wav2vec2 (~500MB)
-- **Whisper Model**: base (~150MB)
-
-This happens inside the Docker container. First startup takes 1-2 minutes.
-
-To rebuild the ML service:
-
-```bash
-docker-compose build ml-service
-docker-compose up ml-service
-```
-
-### Frontend Development
-
-The frontend uses:
-
-- **Vite** for fast HMR
-- **Tailwind CSS** for styling
-- **shadcn/ui** for components
-- **Clerk** for authentication
-
-Hot reloading is enabled - changes appear instantly.
-
-### Backend Development
-
-The backend uses:
-
-- **tsx** for TypeScript execution with watch mode
-- **Prisma** for database ORM
-- **Express** for API server
-
-Changes trigger auto-restart.
-
-## Common Issues
-
-### Issue: "Module not found" errors
-
-**Solution:**
-
-```bash
-cd backend && npm install
-cd ../frontend && npm install
-```
-
-### Issue: Database connection errors
-
-**Solution:**
-
-```bash
-# Check if PostgreSQL is running
-docker ps
-
-# Restart database
-docker-compose restart postgres
-
-# Check logs
-docker-compose logs postgres
-```
-
-### Issue: ML Service timeout
-
-**Solution:**
-
-```bash
-# Check ML service logs
-docker-compose logs ml-service
-
-# Ensure models downloaded
-docker-compose exec ml-service python -c "import whisper; whisper.load_model('base')"
-
-# Rebuild if needed
-docker-compose build --no-cache ml-service
-docker-compose up ml-service
-```
-
-### Issue: Clerk authentication not working
-
-**Solution:**
-
-1. Verify keys in both `.env` files
-2. Check Clerk dashboard for app status
-3. Ensure keys match (same app)
-4. Clear browser cache and cookies
-5. Check browser console for errors
-
-### Issue: Microphone not accessible
-
-**Solution:**
-
-1. Use Chrome or Edge browser
-2. Ensure HTTPS or localhost
-3. Check browser permissions
-4. Grant microphone access when prompted
+**First startup:** ML service takes 1-2 minutes to load models. Check logs: `docker-compose logs -f ml-service`
 
 ## Development Workflow
 
-### Making Database Changes
+### Database Management
 
 ```bash
-cd backend
+# View database in browser
+cd backend && npx prisma studio
 
-# 1. Edit prisma/schema.prisma
-# 2. Create migration
-npx prisma migrate dev --name your_migration_name
+# Create new migration
+npx prisma migrate dev --name migration_name
 
-# 3. Generate client
+# Reset database (WARNING: deletes all data)
+npx prisma migrate reset
+```
+
+### ML Service
+
+**First startup:** Downloads wav2vec2 model (~500MB) automatically. Takes 1-2 minutes.
+
+```bash
+# Rebuild ML service
+docker-compose build ml-service
+docker-compose up ml-service
+
+# Test ML service
+make test-ml
+# or
+python ml-service/test_api.py
+```
+
+### Hot Reloading
+
+- **Frontend**: Vite provides instant HMR
+- **Backend**: tsx auto-restarts on file changes
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| **Module not found** | `cd backend && npm install`<br>`cd frontend && npm install` |
+| **Database connection fails** | Check PostgreSQL: `docker ps`<br>Restart: `docker-compose restart postgres` |
+| **ML Service timeout** | First startup takes 1-2 min<br>Check: `docker-compose logs ml-service`<br>Rebuild: `docker-compose build ml-service` |
+| **Clerk auth fails** | Verify `.env` keys match Clerk dashboard<br>Clear browser cache |
+| **Microphone blocked** | Use Chrome/Edge, check browser permissions<br>Must be HTTPS or localhost |
+| **Port already in use** | Change port in `.env` or kill process:<br>`lsof -ti:5001 \| xargs kill` |
+
+## Adding Features
+
+### New API Endpoint
+1. Create route in `backend/src/routes/`
+2. Register in `backend/src/app.ts`
+3. Update `frontend/src/lib/api.ts`
+
+### Database Changes
+```bash
+# Edit backend/prisma/schema.prisma
+npx prisma migrate dev --name change_description
 npx prisma generate
 ```
 
-### Adding New API Endpoints
-
-1. Create route in `backend/src/routes/`
-2. Add to `backend/src/app.ts`
-3. Update API client in `frontend/src/lib/api.ts`
-4. Update types in `frontend/src/types/index.ts`
-
-### Adding New Components
-
+### UI Components
 ```bash
-# Use shadcn/ui CLI to add components
 cd frontend
 npx shadcn-ui@latest add <component-name>
 ```
 
 ## Testing
 
-### Test Backend API
-
 ```bash
-# Health check
+# Backend health check
 curl http://localhost:5001/health
 
-# Test authenticated endpoint (need token from Clerk)
-curl http://localhost:5001/api/moods \
-  -H "Authorization: Bearer YOUR_CLERK_TOKEN"
+# ML service health check
+curl http://localhost:8000/
+
+# Test ML service
+make test-ml
 ```
-
-### Test ML Service
-
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Test analysis (need audio file)
-curl -X POST http://localhost:8000/analyze \
-  -F "audio=@test.wav" \
-  -F "language=en"
-```
-
-## Production Deployment
-
-### Environment Variables
-
-Set these in production:
-
-- `NODE_ENV=production`
-- `DATABASE_URL` (production database)
-- `CLERK_SECRET_KEY` (production key)
-- `ML_SERVICE_URL` (production ML service URL)
-
-### Build Commands
-
-```bash
-# Frontend
-cd frontend
-npm run build
-# Output: dist/
-
-# Backend
-cd backend
-npm run build
-# Output: dist/
-
-# ML Service
-# Use Dockerfile (already production-ready)
-```
-
-### Deployment Checklist
-
-- [ ] Update CORS origins in backend
-- [ ] Set production database URL
-- [ ] Use production Clerk keys
-- [ ] Enable SSL/HTTPS
-- [ ] Set up health checks
-- [ ] Configure logging
-- [ ] Set up monitoring
-- [ ] Enable database backups
-- [ ] Configure rate limiting
 
 ## Useful Commands
 
 ```bash
-# Reset database (WARNING: deletes all data)
-cd backend
-npx prisma migrate reset
+# Makefile shortcuts
+make help           # Show all commands
+make docker-logs    # View all Docker logs
+make clean          # Clean temp files
 
-# View database
-npx prisma studio
+# Docker commands
+docker-compose ps                    # List running services
+docker-compose logs -f ml-service    # Follow ML service logs
+docker-compose down -v               # Stop and remove volumes
 
-# Check Docker services
-docker-compose ps
-docker-compose logs -f
-
-# Stop all services
-docker-compose down
-
-# Clean Docker volumes
-docker-compose down -v
-
-# Backend logs
-cd backend
-npm run dev 2>&1 | tee logs.txt
-
-# Frontend build
-cd frontend
-npm run build
-npm run preview  # Preview production build
+# Database
+npx prisma studio   # Visual database browser
+npx prisma db push  # Quick schema sync (dev only)
 ```
 
-## Architecture Overview
+## Production Deployment
 
+**Environment Variables:**
+- `NODE_ENV=production`
+- `DATABASE_URL` (production PostgreSQL)
+- `CLERK_SECRET_KEY` (production keys)
+- `ML_SERVICE_URL` (production ML service)
+
+**Build:**
+```bash
+cd frontend && npm run build    # Output: dist/
+cd backend && npm run build     # Output: dist/
 ```
-User Browser
-    ↓ (HTTPS)
-Frontend (React/Vite)
-    ↓ (REST API + JWT)
-Backend (Express/Node)
-    ↓ (Prisma)         ↓ (HTTP)
-PostgreSQL        ML Service (Flask/Python)
-                       ↓
-                  HuggingFace + Whisper
-```
 
-## Key Files
+**Checklist:**
+- [ ] Update CORS origins
+- [ ] Use production Clerk keys
+- [ ] Enable SSL/HTTPS
+- [ ] Configure rate limiting
+- [ ] Set up monitoring
+- [ ] Enable database backups
 
-- `docker-compose.yml` - Container orchestration
-- `backend/prisma/schema.prisma` - Database schema
-- `backend/src/app.ts` - Express app setup
-- `backend/src/routes/` - API endpoints
-- `frontend/src/App.tsx` - React app root
-- `frontend/src/lib/api.ts` - API client
-- `ml-service/app.py` - Flask ML service
+---
 
-## Support
-
-For issues:
-
-1. Check this guide
-2. Check browser console (F12)
-3. Check backend terminal output
-4. Check Docker logs: `docker-compose logs`
-5. Review README.md troubleshooting section
-
-## Next Steps
-
-After setup:
-
-1. Sign up at http://localhost:5173
-2. Complete language selection
-3. Record your first mood entry
-4. View calendar and progress
-5. Customize settings
-
-Happy tracking! 🎙️💚
+For detailed API documentation, see [API_DOCUMENTATION.md](API_DOCUMENTATION.md)

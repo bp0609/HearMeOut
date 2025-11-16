@@ -18,8 +18,10 @@ import {
   Pie,
 } from 'recharts';
 import { api } from '@/lib/api';
+import { useActivities } from '@/hooks/useActivities';
 import { useToast } from '@/hooks/useToast';
 import { getTodayIST } from '@/lib/utils';
+import type { ActivityMoodCorrelation } from '@/types';
 import {
   DAYS_OF_WEEK,
   MONTHS,
@@ -36,6 +38,8 @@ interface MoodTrendPoint {
   emoji: string;
   emotionLevel: number;
   emotion: string;
+  activityKeys: string[];
+  hasSelectedActivity?: boolean;
 }
 
 export default function ProgressPage() {
@@ -52,12 +56,18 @@ export default function ProgressPage() {
   const [showOverall, setShowOverall] = useState(false);
   const [tempYear, setTempYear] = useState(currentDate.getFullYear());
   const [tempMonth, setTempMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedActivityFilter, setSelectedActivityFilter] = useState<string>('all');
 
   // Data state
   const [weekdayData, setWeekdayData] = useState<Record<string, Record<string, number>>>({});
   const [moodCounts, setMoodCounts] = useState<Record<string, number>>({});
   const [totalEntries, setTotalEntries] = useState(0);
   const [trendData, setTrendData] = useState<MoodTrendPoint[]>([]);
+  const [rawTrendData, setRawTrendData] = useState<Array<{ date: string; emoji: string; activityKeys: string[] }>>([]);
+  const [activityCorrelations, setActivityCorrelations] = useState<ActivityMoodCorrelation[]>([]);
+
+  // Fetch activities for labels
+  const { activitiesMap } = useActivities();
 
   // Check if user has checked in today
   useEffect(() => {
@@ -85,24 +95,21 @@ export default function ProgressPage() {
 
         const params = showOverall ? {} : { year: selectedYear, month: selectedMonth };
 
-        // Fetch all three data sets
-        const [weekday, counts, trend] = await Promise.all([
+        // Fetch all data sets including activity correlations
+        const [weekday, counts, trend, activityData] = await Promise.all([
           api.getWeekdayDistribution(params),
           api.getMoodCounts(params),
           api.getMoodTrend(params),
+          api.getActivityMoodCorrelation(params),
         ]);
 
         setWeekdayData(weekday);
         setMoodCounts(counts.moodCounts);
         setTotalEntries(counts.totalEntries);
+        setActivityCorrelations(activityData.correlations);
 
-        // Transform trend data with emotion levels
-        const transformedTrend = trend.map(point => ({
-          ...point,
-          emotionLevel: getEmotionLevel(point.emoji),
-          emotion: getEmotionLabel(point.emoji),
-        }));
-        setTrendData(transformedTrend);
+        // Store raw trend data for filtering
+        setRawTrendData(trend);
       } catch (error) {
         console.error('Error fetching progress data:', error);
         toast({
@@ -117,6 +124,17 @@ export default function ProgressPage() {
 
     fetchData();
   }, [selectedYear, selectedMonth, showOverall, toast]);
+
+  // Transform trend data when raw data or activity filter changes (no loading state)
+  useEffect(() => {
+    const transformedTrend = rawTrendData.map(point => ({
+      ...point,
+      emotionLevel: getEmotionLevel(point.emoji),
+      emotion: getEmotionLabel(point.emoji),
+      hasSelectedActivity: selectedActivityFilter === 'all' || point.activityKeys.includes(selectedActivityFilter),
+    }));
+    setTrendData(transformedTrend);
+  }, [rawTrendData, selectedActivityFilter]);
 
   const handleApplyFilter = () => {
     setSelectedYear(tempYear);
@@ -191,13 +209,15 @@ export default function ProgressPage() {
   });
 
   // Prepare mood count gauge data
-  const moodCountData = Object.entries(moodCounts).map(([emoji, count]) => ({
-    emoji,
-    count,
-    emotion: getEmotionLabel(emoji),
-    emotionKey: getEmotionFromEmoji(emoji),
-    percentage: totalEntries > 0 ? Math.round((count / totalEntries) * 100) : 0,
-  }));
+  const moodCountData = Object.entries(moodCounts)
+    .map(([emoji, count]) => ({
+      emoji,
+      count,
+      emotion: getEmotionLabel(emoji),
+      emotionKey: getEmotionFromEmoji(emoji),
+      percentage: totalEntries > 0 ? Math.round((count / totalEntries) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count); // Sort by count descending
 
   // Group by emotion category for gauge segments
   const emotionData = moodCountData.reduce((acc, item) => {
@@ -221,6 +241,9 @@ export default function ProgressPage() {
   emotionData.forEach(emotion => {
     emotion.percentage = totalEntries > 0 ? Math.round((emotion.count / totalEntries) * 100) : 0;
   });
+
+  // Sort emotion data by count (descending) to find dominant emotion
+  emotionData.sort((a, b) => b.count - a.count);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4 md:p-8">
@@ -401,12 +424,44 @@ export default function ProgressPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="day" />
                       <YAxis
-                        label={{ value: 'Average Emotion Level', angle: -90, position: 'insideLeft' }}
+                        label={{ value: 'Emotion Level', angle: -90, position: 'insideLeft' }}
                         domain={[0, 9]}
                         ticks={[1, 2, 3, 4, 5, 6, 7, 8]}
-                        tickFormatter={(value) => {
-                          const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === value);
-                          return emotion ? EMOTIONS[emotion].emoji : '';
+                        width={70}
+                        tick={({ x, y, payload }) => {
+                          const emoji = getEmotionEmojiFromLevel(payload.value);
+                          const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === payload.value);
+                          const label = emotion ? EMOTIONS[emotion].label : '';
+
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              {/* Level number - positioned to the left */}
+                              <text
+                                x={-30}
+                                y={0}
+                                dy={4}
+                                textAnchor="middle"
+                                fill="#999"
+                                fontSize="11"
+                                fontWeight="bold"
+                              >
+                                {payload.value}
+                              </text>
+                              {/* Emoji - positioned to the right of the number */}
+                              <text
+                                x={-10}
+                                y={0}
+                                dy={4}
+                                textAnchor="middle"
+                                fill="#666"
+                                fontSize="20"
+                              >
+                                {emoji}
+                              </text>
+                              {/* Tooltip on hover */}
+                              <title>{`Level ${payload.value}: ${label}`}</title>
+                            </g>
+                          );
                         }}
                       />
                       <Tooltip
@@ -426,17 +481,21 @@ export default function ProgressPage() {
                                     </div>
                                     <div className="space-y-1">
                                       <p className="text-xs font-semibold text-gray-700 mb-1">Mood breakdown:</p>
-                                      {data.emojiBreakdown.map((item: any, idx: number) => (
-                                        <div key={idx} className="flex items-center justify-between text-sm">
-                                          <span>
-                                            <span className="text-lg mr-2">{item.emoji}</span>
-                                            {item.emotion}
-                                          </span>
-                                          <span className="text-gray-600">
-                                            {item.count} ({item.percentage}%)
-                                          </span>
-                                        </div>
-                                      ))}
+                                      {data.emojiBreakdown.map((item: any, idx: number) => {
+                                        const level = getEmotionLevel(item.emoji);
+                                        return (
+                                          <div key={idx} className="flex items-center justify-between text-sm">
+                                            <span>
+                                              <span className="text-lg mr-2">{item.emoji}</span>
+                                              {item.emotion}
+                                              <span className="text-xs text-gray-400 ml-1">(L{level})</span>
+                                            </span>
+                                            <span className="text-gray-600">
+                                              {item.count} ({item.percentage}%)
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </>
                                 ) : (
@@ -527,10 +586,10 @@ export default function ProgressPage() {
                               const data = payload[0].payload;
                               return (
                                 <div
-                                  className="bg-white p-3 border-2 rounded-lg shadow-xl z-50"
+                                  className="bg-white p-3 border-2 rounded-lg shadow-xl"
                                   style={{
                                     borderColor: data.color,
-                                    backgroundColor: `${data.color}10`
+                                    zIndex: 9999,
                                   }}
                                 >
                                   <div className="flex items-center gap-2 mb-1">
@@ -552,8 +611,8 @@ export default function ProgressPage() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Center label showing total - with z-index to stay below tooltips */}
-                  <div className="absolute left-1/2 top-[55%] transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none z-0">
+                  {/* Center label showing total - positioned at the base of the pie chart */}
+                  <div className="absolute left-1/2 top-[60%] transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none z-0">
                     <div className="text-4xl font-bold text-gray-800">{totalEntries}</div>
                     <div className="text-sm text-gray-500 font-medium">Total Entries</div>
                   </div>
@@ -599,15 +658,51 @@ export default function ProgressPage() {
             {/* 3. Mood Trend Line Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Mood Trend Over Time</CardTitle>
-                <CardDescription>
-                  Track how your emotions change day by day
-                  {trendData.length > 60 && (
-                    <span className="block mt-1 text-xs">
-                      📊 Scroll horizontally to view all {trendData.length} entries
-                    </span>
-                  )}
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <CardTitle>Mood Trend Over Time</CardTitle>
+                    <CardDescription>
+                      Track how your emotions change day by day
+                      {selectedActivityFilter !== 'all' && (
+                        <span className="block mt-1 text-purple-600 font-medium">
+                          🎯 Highlighting days with: {activitiesMap.get(selectedActivityFilter)?.icon} {activitiesMap.get(selectedActivityFilter)?.label}
+                        </span>
+                      )}
+                      {trendData.length > 60 && (
+                        <span className="block mt-1 text-xs">
+                          📊 Scroll horizontally to view all {trendData.length} entries
+                        </span>
+                      )}
+                    </CardDescription>
+                  </div>
+
+                  {/* Activity Filter Dropdown */}
+                  <div className="flex flex-col items-end gap-2">
+                    <label className="text-sm font-medium text-gray-700">Filter by Activity:</label>
+                    <select
+                      value={selectedActivityFilter}
+                      onChange={(e) => setSelectedActivityFilter(e.target.value)}
+                      className="
+                        min-w-[200px] px-3 py-2 text-sm font-medium
+                        border-2 border-gray-200 rounded-lg
+                        bg-white hover:bg-gray-50
+                        focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent
+                        transition-all duration-200 cursor-pointer
+                      "
+                    >
+                      <option value="all">🗓️ All Days</option>
+                      <optgroup label="Activities">
+                        {Array.from(activitiesMap.values())
+                          .sort((a, b) => a.order - b.order)
+                          .map(activity => (
+                            <option key={activity.key} value={activity.key}>
+                              {activity.icon} {activity.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {/* Scrollable container for large datasets */}
@@ -652,10 +747,42 @@ export default function ProgressPage() {
                         <YAxis
                           domain={[0, 9]}
                           ticks={[1, 2, 3, 4, 5, 6, 7, 8]}
-                          tickFormatter={(value) => {
-                            return getEmotionEmojiFromLevel(value);
+                          width={70}
+                          tick={({ x, y, payload }) => {
+                            const emoji = getEmotionEmojiFromLevel(payload.value);
+                            const emotion = EMOTION_ORDER.find(key => EMOTIONS[key].level === payload.value);
+                            const label = emotion ? EMOTIONS[emotion].label : '';
+
+                            return (
+                              <g transform={`translate(${x},${y})`}>
+                                {/* Level number - positioned to the left */}
+                                <text
+                                  x={-30}
+                                  y={0}
+                                  dy={4}
+                                  textAnchor="middle"
+                                  fill="#999"
+                                  fontSize="11"
+                                  fontWeight="bold"
+                                >
+                                  {payload.value}
+                                </text>
+                                {/* Emoji - positioned to the right of the number */}
+                                <text
+                                  x={-10}
+                                  y={0}
+                                  dy={4}
+                                  textAnchor="middle"
+                                  fill="#666"
+                                  fontSize="18"
+                                >
+                                  {emoji}
+                                </text>
+                                {/* Tooltip on hover */}
+                                <title>{`Level ${payload.value}: ${label}`}</title>
+                              </g>
+                            );
                           }}
-                          width={40}
                           label={{
                             value: 'Emotions',
                             angle: -90,
@@ -669,6 +796,12 @@ export default function ProgressPage() {
                               const data = payload[0].payload as MoodTrendPoint;
                               const d = new Date(data.date);
                               const formattedDate = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+
+                              // Get activities for this day
+                              const dayActivities = data.activityKeys
+                                .map(key => activitiesMap.get(key))
+                                .filter(Boolean);
+
                               return (
                                 <div className="bg-white p-3 border rounded shadow-lg">
                                   <p className="text-sm text-gray-600">{formattedDate}</p>
@@ -676,6 +809,36 @@ export default function ProgressPage() {
                                   <p className="text-sm font-medium">
                                     {data.emotion}
                                   </p>
+                                  <p className="text-xs text-gray-500 mt-1 text-center">
+                                    Level: {data.emotionLevel}
+                                  </p>
+
+                                  {dayActivities.length > 0 && (
+                                    <div className="mt-3 pt-2 border-t">
+                                      <p className="text-xs font-semibold text-gray-600 mb-1">Activities:</p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {dayActivities.map(activity => {
+                                          // Get mood color for this day
+                                          const emotionKey = getEmotionFromEmoji(data.emoji);
+                                          const moodColor = EMOTIONS[emotionKey].color;
+
+                                          return (
+                                            <span
+                                              key={activity!.key}
+                                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs"
+                                              style={{
+                                                backgroundColor: `${moodColor}20`,
+                                                color: moodColor,
+                                                border: `1px solid ${moodColor}40`
+                                              }}
+                                            >
+                                              {activity!.icon} {activity!.label}
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             }
@@ -685,32 +848,104 @@ export default function ProgressPage() {
                         <Line
                           type="monotone"
                           dataKey="emotionLevel"
-                          stroke="#8b5cf6"
+                          stroke="#9ca3af"
                           strokeWidth={2}
                           dot={(props: any) => {
                             const { cx, cy, payload, index } = props;
-                            if (!payload || !cx || !cy) return <circle cx={cx} cy={cy} r={0} />;
+                            if (!payload || !cx || !cy) return <circle key={`dot-empty-${index}`} cx={0} cy={0} r={0} />;
 
-                            // For large datasets, show fewer emojis (every nth point)
-                            const showInterval = trendData.length > 180 ? 7 : trendData.length > 90 ? 4 : trendData.length > 60 ? 2 : 1;
+                            // Get the emotion color based on the emoji
+                            const emotionKey = getEmotionFromEmoji(payload.emoji);
+                            const color = EMOTIONS[emotionKey].color;
 
-                            if (index % showInterval === 0 || trendData.length <= 60) {
+                            // Check if this point has the selected activity
+                            const hasActivity = payload.hasSelectedActivity;
+                            const isFiltered = selectedActivityFilter !== 'all';
+
+                            // If filtering and this point has the activity, make it larger and add a ring
+                            if (isFiltered && hasActivity) {
                               return (
-                                <text
-                                  x={cx}
-                                  y={cy}
-                                  textAnchor="middle"
-                                  dominantBaseline="middle"
-                                  fontSize={trendData.length > 90 ? "16" : "20"}
-                                >
-                                  {payload.emoji}
-                                </text>
+                                <g key={`dot-group-${index}`}>
+                                  {/* Outer glow ring */}
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={12}
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth={3}
+                                    opacity={0.3}
+                                  />
+                                  {/* Main dot */}
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={8}
+                                    fill={color}
+                                    stroke="#fff"
+                                    strokeWidth={3}
+                                  />
+                                  {/* Inner highlight */}
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={3}
+                                    fill="#fff"
+                                    opacity={0.7}
+                                  />
+                                </g>
                               );
                             }
-                            // Show small dot for points without emoji
-                            return <circle cx={cx} cy={cy} r={3} fill="#8b5cf6" />;
+
+                            // If filtering and this point doesn't have the activity, make it smaller and dimmed
+                            if (isFiltered && !hasActivity) {
+                              return (
+                                <circle
+                                  key={`dot-${index}`}
+                                  cx={cx}
+                                  cy={cy}
+                                  r={4}
+                                  fill={color}
+                                  stroke="#fff"
+                                  strokeWidth={1}
+                                  opacity={0.3}
+                                />
+                              );
+                            }
+
+                            // Default: normal dot
+                            return (
+                              <circle
+                                key={`dot-${index}`}
+                                cx={cx}
+                                cy={cy}
+                                r={6}
+                                fill={color}
+                                stroke="#fff"
+                                strokeWidth={2}
+                              />
+                            );
                           }}
-                          activeDot={{ r: 8 }}
+                          activeDot={(props: any) => {
+                            const { cx, cy, payload, index } = props;
+                            if (!payload || !cx || !cy) return <circle key={`active-empty-${index}`} cx={0} cy={0} r={0} />;
+
+                            // Get the emotion color based on the emoji
+                            const emotionKey = getEmotionFromEmoji(payload.emoji);
+                            const color = EMOTIONS[emotionKey].color;
+
+                            return (
+                              <circle
+                                key={`active-${index}`}
+                                cx={cx}
+                                cy={cy}
+                                r={10}
+                                fill={color}
+                                stroke="#fff"
+                                strokeWidth={2}
+                              />
+                            );
+                          }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -731,30 +966,150 @@ export default function ProgressPage() {
                     })()}
                   </div>
                 )}
-
-                {/* Legend with emotion scale */}
-                <div className="mt-6 pt-6 border-t">
-                  <h4 className="font-semibold mb-3 text-center">Emotion Scale</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
-                    {EMOTION_ORDER.map(key => {
-                      const emotion = EMOTIONS[key];
-                      return (
-                        <div key={key} className="flex items-center gap-2 p-2 rounded bg-gray-50">
-                          <span className="text-2xl">{emotion.emoji}</span>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium">{emotion.label}</div>
-                            <div
-                              className="w-full h-1 rounded mt-1"
-                              style={{ backgroundColor: emotion.color }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
               </CardContent>
             </Card>
+
+            {/* 4. Activity-Mood Correlation Chart */}
+            {activityCorrelations.length > 0 && (() => {
+              // Sort activities alphabetically by name
+              const sortedActivityCorrelations = [...activityCorrelations].sort((a, b) => {
+                const activityA = activitiesMap.get(a.activityKey);
+                const activityB = activitiesMap.get(b.activityKey);
+                const labelA = activityA?.label || '';
+                const labelB = activityB?.label || '';
+                return labelA.localeCompare(labelB);
+              });
+
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>How Activities Affect Your Mood</CardTitle>
+                    <CardDescription>
+                      Average mood level for each activity (higher is better)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={Math.max(300, sortedActivityCorrelations.length * 40)}>
+                      <BarChart
+                        data={sortedActivityCorrelations}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" domain={[0, 10]} />
+                        <YAxis
+                          dataKey="activityKey"
+                          type="category"
+                          width={150}
+                          tick={(props: any) => {
+                            const { x, y, payload } = props;
+                            const activity = activitiesMap.get(payload.value);
+                            if (!activity) return <g />;
+
+                            return (
+                              <g transform={`translate(${x},${y})`}>
+                                <text
+                                  x={-10}
+                                  y={0}
+                                  dy={4}
+                                  textAnchor="end"
+                                  fill="#666"
+                                  fontSize="14"
+                                >
+                                  <tspan fontSize="16">{activity.icon}</tspan>
+                                  <tspan dx="8">{activity.label}</tspan>
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload || payload.length === 0) return null;
+
+                            const data = payload[0].payload;
+                            const activity = activitiesMap.get(data.activityKey);
+
+                            // Get the emoji for the closest mood level
+                            const emotionLevel = Math.min(8, Math.max(1, Math.round(data.averageMood * 0.8)));
+                            const closestMoodEmoji = getEmotionEmojiFromLevel(emotionLevel);
+
+                            return (
+                              <div className="bg-white p-3 rounded-lg shadow-lg border">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-2xl">{activity?.icon}</span>
+                                  <span className="font-semibold">{activity?.label}</span>
+                                </div>
+                                <div className="text-sm space-y-1">
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Average Mood:</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">{closestMoodEmoji}</span>
+                                      <span className="font-bold">{data.averageMood.toFixed(1)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Entries:</span>
+                                    <span>{data.count}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }}
+                        />
+                        <Bar
+                          dataKey="averageMood"
+                          radius={[0, 8, 8, 0]}
+                          fill="#8884d8"
+                        >
+                          {sortedActivityCorrelations.map((entry, index) => {
+                            // Get emotion color based on average mood level
+                            // averageMood is on 1-10 scale, but emotion levels are 1-8
+                            // Map 1-10 to 1-8: round to nearest emotion level
+                            const emotionLevel = Math.min(8, Math.max(1, Math.round(entry.averageMood * 0.8)));
+                            const emotionKey = EMOTION_ORDER.find(key => EMOTIONS[key].level === emotionLevel);
+                            const color = emotionKey ? EMOTIONS[emotionKey].color : '#8884d8';
+                            return <Cell key={`cell-${index}`} fill={color} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    {/* Insights */}
+                    {sortedActivityCorrelations.length > 0 && (
+                      <div className="mt-4 p-4 bg-purple-50 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-2xl">💡</span>
+                          <div>
+                            <p className="font-semibold text-purple-900 mb-1">Insight</p>
+                            <p className="text-sm text-purple-800">
+                              {(() => {
+                                // Find the activity with highest and lowest mood (not alphabetically sorted)
+                                const best = sortedActivityCorrelations.reduce((max, curr) =>
+                                  curr.averageMood > max.averageMood ? curr : max
+                                );
+                                const worst = sortedActivityCorrelations.reduce((min, curr) =>
+                                  curr.averageMood < min.averageMood ? curr : min
+                                );
+                                const bestActivity = activitiesMap.get(best.activityKey);
+                                const diffValue = sortedActivityCorrelations.length > 1
+                                  ? parseFloat((best.averageMood - worst.averageMood).toFixed(1))
+                                  : 0;
+
+                                return bestActivity
+                                  ? `Your mood is highest when "${bestActivity.label}" (${best.averageMood.toFixed(1)}). ${diffValue > 0 ? `That's ${diffValue} points higher than your lowest-rated activity!` : ''
+                                  }`
+                                  : 'Track more activities to see insights!';
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
         )}
       </div>

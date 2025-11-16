@@ -1,4 +1,4 @@
-import { Mic, Square, Play, Pause } from 'lucide-react';
+import { Mic, Square, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -23,6 +23,7 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
     stopRecording,
     pauseRecording,
     resumeRecording,
+    resetRecording,
     error,
   } = useAudioRecorder();
 
@@ -82,10 +83,15 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
 
   useEffect(() => {
     if (audioBlob && !isRecording) {
-      console.log('[VoiceRecorder] Triggering recording complete callback');
+      console.log('[VoiceRecorder] Recording stopped, proceeding with upload');
       onRecordingCompleteRef.current(audioBlob, duration);
     }
   }, [audioBlob, isRecording, duration]);
+
+  const handleRetry = () => {
+    console.log('[VoiceRecorder] Retry clicked - resetting recording');
+    resetRecording();
+  };
 
   return (
     <Card className="p-8">
@@ -197,6 +203,15 @@ export function VoiceRecorder({ onRecordingComplete, language = 'en' }: VoiceRec
             </Button>
           ) : (
             <>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleRetry}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+
               {!isPaused ? (
                 <Button
                   size="lg"

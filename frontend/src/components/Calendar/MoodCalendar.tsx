@@ -1,23 +1,31 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ActivityEditDialog } from '@/components/ActivityEditDialog';
 import { useCalendarData } from '@/hooks/useMoodData';
+import { useActivities } from '@/hooks/useActivities';
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api';
 import { getDaysInMonth, getFirstDayOfMonth, formatDate, isTodayIST } from '@/lib/utils';
 import { DAYS_OF_WEEK, MONTHS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { MoodEntryActivity, MoodEntry } from '@/types';
 
 export function MoodCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<MoodEntry | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const { isLoaded } = useAuth();
 
-  const { calendarData, loading } = useCalendarData(year, month + 1);
+  const { calendarData, loading, refetch } = useCalendarData(year, month + 1);
+  const { activities, activitiesMap, loading: activitiesLoading } = useActivities();
 
   // Show loading state while auth is initializing
-  const isActuallyLoading = loading || !isLoaded;
+  const isActuallyLoading = loading || !isLoaded || activitiesLoading;
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDayOfMonth = getFirstDayOfMonth(year, month);
@@ -52,6 +60,44 @@ export function MoodCalendar() {
     const date = formatDate(new Date(year, month, day));
     const entry = calendarData.find(d => d.date === date);
     return entry?.emoji || null;
+  };
+
+  // Get activities for a specific date
+  const getActivitiesForDate = (day: number): MoodEntryActivity[] => {
+    const date = formatDate(new Date(year, month, day));
+    const entry = calendarData.find(d => d.date === date);
+    return entry?.activities || [];
+  };
+
+  // Handle day click to edit activities
+  const handleDayClick = async (day: number) => {
+    const dateString = formatDate(new Date(year, month, day));
+    const entry = calendarData.find(d => d.date === dateString);
+
+    if (entry && entry.emoji) {
+      setSelectedDate(dateString);
+
+      // Fetch full entry with activities
+      try {
+        const fullEntry = await api.getMoodEntryByDate(dateString);
+        if (fullEntry) {
+          setSelectedEntry(fullEntry);
+          setEditDialogOpen(true);
+        }
+      } catch (error) {
+        console.error('Error fetching entry:', error);
+      }
+    }
+  };
+
+  const handleDialogClose = () => {
+    setEditDialogOpen(false);
+    setSelectedEntry(null);
+    setSelectedDate(null);
+  };
+
+  const handleUpdate = () => {
+    refetch();
   };
 
   return (
@@ -110,22 +156,53 @@ export function MoodCalendar() {
             const date = new Date(year, month, day);
             const dateString = formatDate(date);
             const emoji = getEmojiForDate(day);
+            const activities = getActivitiesForDate(day);
             const isTodayDate = isTodayIST(dateString); // Use IST-aware date checking
+            const hasEntry = emoji !== null;
 
             return (
               <div
                 key={day}
+                onClick={() => hasEntry && handleDayClick(day)}
                 className={cn(
-                  'aspect-square flex flex-col items-center justify-center rounded-lg border-2 transition-all hover:border-primary/50 cursor-pointer',
+                  'aspect-square flex flex-col items-center justify-center rounded-lg border-2 transition-all',
                   isTodayDate
                     ? 'border-primary bg-primary/10'
                     : 'border-border bg-card',
-                  emoji ? 'hover:scale-105' : ''
+                  hasEntry ? 'hover:border-primary/50 hover:scale-105 cursor-pointer group' : ''
                 )}
               >
                 <div className="text-sm text-muted-foreground">{day}</div>
                 {emoji && (
-                  <div className="text-3xl emoji mt-1">{emoji}</div>
+                  <>
+                    <div className="text-3xl emoji mt-1">{emoji}</div>
+                    {activities.length > 0 && (
+                      <div className="flex flex-wrap gap-0.5 mt-1 max-w-full px-1">
+                        {activities.slice(0, 3).map((activity) => {
+                          // Use activity details from backend if available, otherwise lookup from map
+                          const activityInfo = activity.activity || activitiesMap.get(activity.activityKey);
+                          return activityInfo ? (
+                            <div
+                              key={activity.id}
+                              className="text-xs emoji"
+                              title={activityInfo.label}
+                            >
+                              {activityInfo.icon}
+                            </div>
+                          ) : null;
+                        })}
+                        {activities.length > 3 && (
+                          <div className="text-xs text-muted-foreground">
+                            +{activities.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Edit indicator on hover */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute top-1 right-1">
+                      <Edit2 className="h-3 w-3 text-primary" />
+                    </div>
+                  </>
                 )}
               </div>
             );
@@ -139,6 +216,15 @@ export function MoodCalendar() {
           Go to Today
         </Button>
       </div>
+
+      {/* Activity Edit Dialog */}
+      <ActivityEditDialog
+        open={editDialogOpen}
+        onClose={handleDialogClose}
+        entry={selectedEntry}
+        activities={activities}
+        onUpdate={handleUpdate}
+      />
     </Card>
   );
 }
