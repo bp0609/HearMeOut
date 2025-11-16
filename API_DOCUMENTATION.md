@@ -1,530 +1,451 @@
 # API Documentation
 
-This document provides a brief overview of all available APIs in the HearMeOut application.
+Complete API reference for HearMeOut backend.
 
-**Base URL:** `http://localhost:5001` (or your configured API URL)
+**Base URL:** `http://localhost:5001`
 
-**Authentication:** All protected endpoints require a Bearer token in the Authorization header:
-
+**Authentication:** All endpoints except `/health` require Clerk JWT token:
 ```
 Authorization: Bearer <clerk_jwt_token>
 ```
 
 ---
 
-## Table of Contents
-
-- [Mood Entry APIs](#mood-entry-apis)
-- [Progress & Analytics APIs](#progress--analytics-apis)
-- [Settings APIs](#settings-apis)
-- [Health Check API](#health-check-api)
-
----
-
 ## Mood Entry APIs
 
-### 1. Create Mood Entry (Upload Audio)
+### Create Mood Entry
 
-Upload an audio recording and create a mood entry with ML analysis.
+`POST /api/moods`
 
-**Endpoint:** `POST /api/moods`
+Upload audio and create mood entry with ML analysis.
 
-**Headers:**
-
+**Request:**
+```bash
+curl -X POST http://localhost:5001/api/moods \
+  -H "Authorization: Bearer <token>" \
+  -F "audio=@recording.webm" \
+  -F "language=en" \
+  -F "duration=45"
 ```
-Authorization: Bearer <token>
-Content-Type: multipart/form-data
-```
 
-**Request Body (FormData):**
+**Request Fields:**
+- `audio` (file): Audio file (WAV, WEBM, OGG, MP3) - Max 10MB
+- `language` (string): `en`, `hi`, or `gu`
+- `duration` (number): 30-60 seconds
 
-- `audio` (File): Audio file (WAV, WEBM, OGG, MP3) - Max 10MB
-- `language` (string): Language code - `en`, `hi`, or `gu`
-- `duration` (number): Recording duration in seconds (30-60)
-
-**Response:**
-
+**Response:** `201 Created`
 ```json
 {
   "success": true,
   "data": {
-    "id": "mood-entry-id",
-    "entryDate": "2024-01-15",
-    "transcription": "I had a great day today...",
+    "id": "clp8k9xyz...",
+    "entryDate": "2024-11-16",
     "emotionScores": [
-      { "emotion": "happy", "score": 0.85 },
-      { "emotion": "neutral", "score": 0.1 }
-    ],
-    "suggestedEmojis": ["😊", "😄", "🥰"]
+      { "emoji": "😊", "emotion": "happy", "confidence": 85 },
+      { "emoji": "😌", "emotion": "calm", "confidence": 10 },
+      { "emoji": "😐", "emotion": "neutral", "confidence": 3 },
+      { "emoji": "😮", "emotion": "surprised", "confidence": 1 },
+      { "emoji": "😢", "emotion": "sad", "confidence": 1 },
+      { "emoji": "😠", "emotion": "angry", "confidence": 0 },
+      { "emoji": "😒", "emotion": "disgust", "confidence": 0 },
+      { "emoji": "😰", "emotion": "fearful", "confidence": 0 }
+    ]
   }
 }
 ```
 
-**Example:**
-
-```javascript
-const formData = new FormData();
-formData.append("audio", audioFile);
-formData.append("language", "en");
-formData.append("duration", "45");
-
-const response = await fetch("http://localhost:5001/api/moods", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-  body: formData,
-});
-```
-
-**Error Responses:**
-
-- `400`: Invalid file or missing required fields
-- `409`: Mood entry for today already exists
-- `500`: Server error or ML service unavailable
+**Errors:**
+- `400` - Invalid file or missing fields
+- `409` - Entry already exists for today
+- `500` - ML service unavailable
 
 ---
 
-### 2. Update Mood Entry
+### Update Mood Entry
 
-Update a mood entry with selected emoji and optional context.
+`PATCH /api/moods/:id`
 
-**Endpoint:** `PATCH /api/moods/:id`
+Update mood entry with selected emoji and activities.
 
-**Headers:**
-
-```
-Authorization: Bearer <token>
-Content-Type: application/json
+**Request:**
+```bash
+curl -X PATCH http://localhost:5001/api/moods/clp8k9xyz... \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "selectedEmoji": "😊",
+    "activityKeys": ["exercise", "social"]
+  }'
 ```
 
 **Request Body:**
-
 ```json
 {
   "selectedEmoji": "😊",
-  "activityTags": ["exercise", "social_time"],
-  "userNotes": "Had a great workout today!"
+  "activityKeys": ["exercise", "social", "work"]
 }
 ```
 
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": {
-    "id": "mood-entry-id",
+    "id": "clp8k9xyz...",
     "selectedEmoji": "😊",
-    "activityTags": ["exercise", "social_time"]
+    "activities": [
+      { "key": "exercise", "label": "Exercise", "icon": "🏃" },
+      { "key": "social", "label": "Social Time", "icon": "👥" }
+    ]
   }
 }
 ```
 
-**Example:**
-
-```javascript
-const response = await fetch("http://localhost:5001/api/moods/mood-entry-id", {
-  method: "PATCH",
-  headers: {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    selectedEmoji: "😊",
-    activityTags: ["exercise"],
-    userNotes: "Great day!",
-  }),
-});
-```
-
 ---
 
-### 3. Get Mood Entries
+### Get Mood Entries
 
-Retrieve mood entries for the authenticated user with optional date filtering.
+`GET /api/moods`
 
-**Endpoint:** `GET /api/moods`
+Get mood entries with optional date filtering.
 
 **Query Parameters:**
+- `startDate` (optional): `YYYY-MM-DD`
+- `endDate` (optional): `YYYY-MM-DD`
+- `limit` (optional): Max entries (default: 30)
 
-- `startDate` (optional): Start date filter (ISO format: `YYYY-MM-DD`)
-- `endDate` (optional): End date filter (ISO format: `YYYY-MM-DD`)
-- `limit` (optional): Maximum number of entries to return (default: 30)
+**Request:**
+```bash
+curl http://localhost:5001/api/moods?startDate=2024-11-01&limit=10 \
+  -H "Authorization: Bearer <token>"
+```
 
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": [
     {
-      "id": "mood-entry-id",
-      "entryDate": "2024-01-15",
+      "id": "clp8k9xyz...",
+      "entryDate": "2024-11-16",
+      "dayOfWeek": "Sat",
       "selectedEmoji": "😊",
-      "suggestedEmojis": ["😊", "😄", "🥰"],
-      "activityTags": ["exercise"],
-      "userNotes": "Great day!",
-      "transcription": "I had a great day...",
-      "emotionScores": [...],
-      "createdAt": "2024-01-15T10:30:00Z"
+      "activities": [
+        { "key": "exercise", "label": "Exercise", "icon": "🏃" }
+      ],
+      "duration": 45,
+      "language": "en",
+      "createdAt": "2024-11-16T10:30:00Z"
     }
   ]
 }
 ```
 
-**Example:**
-
-```javascript
-// Get last 30 entries
-const response = await fetch("http://localhost:5001/api/moods?limit=30", {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
-
-// Get entries for date range
-const response = await fetch(
-  "http://localhost:5001/api/moods?startDate=2024-01-01&endDate=2024-01-31",
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
-```
-
 ---
 
-### 4. Get Mood Entry by Date
+### Get Mood Entry by Date
 
-Get a specific mood entry for a given date.
+`GET /api/moods/date/:date`
 
-**Endpoint:** `GET /api/moods/date/:date`
+Get entry for specific date.
 
-**Path Parameters:**
+**Request:**
+```bash
+curl http://localhost:5001/api/moods/date/2024-11-16 \
+  -H "Authorization: Bearer <token>"
+```
 
-- `date`: Date in ISO format (`YYYY-MM-DD`)
-
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": {
-    "id": "mood-entry-id",
-    "entryDate": "2024-01-15",
+    "id": "clp8k9xyz...",
+    "entryDate": "2024-11-16",
     "selectedEmoji": "😊",
-    "suggestedEmojis": ["😊", "😄"],
-    "activityTags": ["exercise"],
-    "userNotes": "Great day!",
-    "transcription": "I had a great day...",
-    "emotionScores": [...],
-    "createdAt": "2024-01-15T10:30:00Z"
+    "activities": [...],
+    "createdAt": "2024-11-16T10:30:00Z"
   }
 }
 ```
 
-**Note:** Returns `null` if no entry exists for that date (not an error).
-
-**Example:**
-
-```javascript
-const response = await fetch(
-  "http://localhost:5001/api/moods/date/2024-01-15",
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
-```
+Returns `data: null` if no entry exists.
 
 ---
 
-### 5. Delete Mood Entry
+### Delete Mood Entry
 
-Delete a mood entry.
+`DELETE /api/moods/:id`
 
-**Endpoint:** `DELETE /api/moods/:id`
+Delete a mood entry and associated audio file (if stored).
 
-**Response:**
+**Request:**
+```bash
+curl -X DELETE http://localhost:5001/api/moods/clp8k9xyz... \
+  -H "Authorization: Bearer <token>"
+```
 
+**Response:** `200 OK`
 ```json
 {
   "success": true,
-  "message": "Mood entry deleted"
+  "message": "Mood entry deleted successfully"
 }
-```
-
-**Example:**
-
-```javascript
-const response = await fetch("http://localhost:5001/api/moods/mood-entry-id", {
-  method: "DELETE",
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
 ```
 
 ---
 
 ## Progress & Analytics APIs
 
-### 1. Get Progress Summary
+### Get Progress Summary
 
-Get mood distribution, streak, and weekly summary statistics.
+`GET /api/progress/summary`
 
-**Endpoint:** `GET /api/progress/summary`
+Mood distribution and statistics.
 
 **Query Parameters:**
+- `days` (optional): Analysis period (default: 30)
 
-- `days` (optional): Number of days to analyze (default: 30)
+**Request:**
+```bash
+curl http://localhost:5001/api/progress/summary?days=30 \
+  -H "Authorization: Bearer <token>"
+```
 
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": {
     "moodDistribution": [
-      {
-        "emoji": "😊",
-        "count": 15,
-        "percentage": 50
-      },
-      {
-        "emoji": "😐",
-        "count": 10,
-        "percentage": 33
-      }
+      { "emoji": "😊", "count": 15, "percentage": 50 },
+      { "emoji": "😐", "count": 10, "percentage": 33 },
+      { "emoji": "😢", "count": 5, "percentage": 17 }
     ],
     "totalEntries": 30,
     "streakDays": 7,
-    "weeklySummary": "You've had a great week! Your positive energy is shining through.",
     "hasEnoughData": true
   }
 }
 ```
 
-**Example:**
-
-```javascript
-// Get summary for last 30 days
-const response = await fetch("http://localhost:5001/api/progress/summary", {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
-
-// Get summary for last 60 days
-const response = await fetch(
-  "http://localhost:5001/api/progress/summary?days=60",
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
-```
-
 ---
 
-### 2. Get Calendar Data
+### Get Calendar Data
 
-Get mood entries for a specific month in calendar format.
+`GET /api/progress/calendar/:year/:month`
 
-**Endpoint:** `GET /api/progress/calendar/:year/:month`
+Mood entries for calendar view.
 
-**Path Parameters:**
+**Request:**
+```bash
+curl http://localhost:5001/api/progress/calendar/2024/11 \
+  -H "Authorization: Bearer <token>"
+```
 
-- `year`: Year (e.g., `2024`)
-- `month`: Month (1-12)
-
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": [
-    {
-      "date": "2024-01-15",
-      "emoji": "😊"
-    },
-    {
-      "date": "2024-01-16",
-      "emoji": "😐"
-    }
+    { "date": "2024-11-15", "emoji": "😊" },
+    { "date": "2024-11-16", "emoji": "😌" }
   ]
 }
 ```
 
-**Example:**
-
-```javascript
-// Get calendar data for January 2024
-const response = await fetch(
-  "http://localhost:5001/api/progress/calendar/2024/1",
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
-```
-
 ---
 
-### 3. Get Active Alerts
+### Get Active Alerts
 
-Get all active (non-dismissed) pattern alerts for the user.
+`GET /api/progress/alerts`
 
-**Endpoint:** `GET /api/progress/alerts`
+Pattern detection alerts (non-dismissed).
 
-**Response:**
+**Request:**
+```bash
+curl http://localhost:5001/api/progress/alerts \
+  -H "Authorization: Bearer <token>"
+```
 
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": [
     {
-      "id": "alert-id",
+      "id": "alert_123",
       "alertType": "consecutive_low",
-      "detectedAt": "2024-01-15T10:30:00Z",
-      "message": "We've noticed you've been feeling low for 5 days in a row...",
-      "suggestions": [
-        "Try a 10-minute guided meditation",
-        "Take a short walk outside",
-        "Talk to a trusted friend or family member"
-      ]
+      "detectedAt": "2024-11-16T10:30:00Z",
+      "patternDetails": {
+        "consecutiveDays": 5,
+        "emotions": ["sad", "sad", "fearful", "sad", "sad"]
+      }
     }
   ]
 }
 ```
 
 **Alert Types:**
+- `consecutive_low` - Multiple low mood days in a row
+- `sudden_drop` - Abrupt change from positive to negative
 
-- `consecutive_low`: Multiple consecutive days with low mood
-- `sudden_drop`: Sudden mood drop from positive to negative
+---
 
-**Example:**
+### Dismiss Alert
 
-```javascript
-const response = await fetch("http://localhost:5001/api/progress/alerts", {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
+`POST /api/progress/alerts/:id/dismiss`
+
+Mark alert as dismissed.
+
+**Request:**
+```bash
+curl -X POST http://localhost:5001/api/progress/alerts/alert_123/dismiss \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Alert dismissed successfully"
+}
 ```
 
 ---
 
-### 4. Dismiss Alert
+## Activities APIs
 
-Mark an alert as dismissed.
+### Get Activities
 
-**Endpoint:** `POST /api/progress/alerts/:id/dismiss`
+`GET /api/activities`
 
-**Path Parameters:**
+List all available activities.
 
-- `id`: Alert ID
+**Request:**
+```bash
+curl http://localhost:5001/api/activities \
+  -H "Authorization: Bearer <token>"
+```
 
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
-  "message": "Alert dismissed"
+  "data": [
+    { "key": "exercise", "label": "Exercise", "icon": "🏃", "color": "#10B981" },
+    { "key": "social", "label": "Social Time", "icon": "👥", "color": "#3B82F6" },
+    { "key": "work", "label": "Work/Study", "icon": "💼", "color": "#8B5CF6" }
+  ]
 }
 ```
 
-**Example:**
+---
 
-```javascript
-const response = await fetch(
-  "http://localhost:5001/api/progress/alerts/alert-id/dismiss",
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+### Create Activity
+
+`POST /api/activities`
+
+Create custom activity.
+
+**Request:**
+```bash
+curl -X POST http://localhost:5001/api/activities \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "meditation",
+    "label": "Meditation",
+    "icon": "🧘",
+    "color": "#A855F7"
+  }'
+```
+
+**Response:** `201 Created`
+```json
+{
+  "success": true,
+  "data": {
+    "key": "meditation",
+    "label": "Meditation",
+    "icon": "🧘",
+    "color": "#A855F7"
   }
-);
+}
 ```
 
 ---
 
 ## Settings APIs
 
-### 1. Get User Settings
+### Get Settings
 
-Retrieve user settings and preferences.
+`GET /api/settings`
 
-**Endpoint:** `GET /api/settings`
+Get user settings and preferences.
 
-**Response:**
+**Request:**
+```bash
+curl http://localhost:5001/api/settings \
+  -H "Authorization: Bearer <token>"
+```
 
+**Response:** `200 OK`
 ```json
 {
   "success": true,
   "data": {
-    "reminderEnabled": true,
-    "reminderTime": "09:00",
+    "reminderEnabled": false,
+    "reminderTime": "20:00",
     "interventionThreshold": 5,
-    "cloudStorageEnabled": false,
+    "audioStorageEnabled": false,
+    "audioStorageConsent": null,
     "preferredLanguage": "en"
   }
 }
 ```
 
-**Example:**
-
-```javascript
-const response = await fetch("http://localhost:5001/api/settings", {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
-```
-
 ---
 
-### 2. Update User Settings
+### Update Settings
 
-Update user settings and preferences.
+`PATCH /api/settings`
 
-**Endpoint:** `PATCH /api/settings`
+Update user settings.
 
-**Headers:**
-
-```
-Authorization: Bearer <token>
-Content-Type: application/json
+**Request:**
+```bash
+curl -X PATCH http://localhost:5001/api/settings \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reminderEnabled": true,
+    "reminderTime": "09:00",
+    "interventionThreshold": 3,
+    "audioStorageEnabled": true,
+    "preferredLanguage": "en"
+  }'
 ```
 
 **Request Body:**
-
 ```json
 {
   "reminderEnabled": true,
   "reminderTime": "09:00",
   "interventionThreshold": 5,
-  "cloudStorageEnabled": false,
+  "audioStorageEnabled": false,
   "preferredLanguage": "en"
 }
 ```
 
-**Field Descriptions:**
+**Fields:**
+- `reminderEnabled` (boolean): Daily reminders
+- `reminderTime` (string): 24-hour format `HH:MM`
+- `interventionThreshold` (number): Days before alert (3-14)
+- `audioStorageEnabled` (boolean): Store audio files
+- `preferredLanguage` (string): `en`, `hi`, or `gu`
 
-- `reminderEnabled` (boolean): Enable/disable daily reminders
-- `reminderTime` (string): Time in 24-hour format (HH:MM)
-- `interventionThreshold` (number): Days of consecutive low mood before alert (3-14)
-- `cloudStorageEnabled` (boolean): Enable cloud storage (future feature)
-- `preferredLanguage` (string): Language preference - `en`, `hi`, or `gu`
-
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "success": true,
@@ -532,98 +453,105 @@ Content-Type: application/json
     "reminderEnabled": true,
     "reminderTime": "09:00",
     "interventionThreshold": 5,
-    "cloudStorageEnabled": false,
+    "audioStorageEnabled": false,
     "preferredLanguage": "en"
   }
 }
 ```
 
-**Example:**
-
-```javascript
-const response = await fetch("http://localhost:5001/api/settings", {
-  method: "PATCH",
-  headers: {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    reminderEnabled: true,
-    reminderTime: "09:00",
-    interventionThreshold: 5,
-    preferredLanguage: "en",
-  }),
-});
-```
+**Note:** Disabling `audioStorageEnabled` automatically deletes all stored audio files.
 
 ---
 
-## Health Check API
+## Health Check
 
-### Health Check
+`GET /health`
 
-Check the health status of the API and ML service.
+Check API and ML service status. **No authentication required.**
 
-**Endpoint:** `GET /health`
+**Request:**
+```bash
+curl http://localhost:5001/health
+```
 
-**No Authentication Required**
-
-**Response:**
-
+**Response:** `200 OK`
 ```json
 {
   "status": "ok",
-  "timestamp": "2024-01-15T10:30:00.000Z",
+  "timestamp": "2024-11-16T10:30:00Z",
   "services": {
-    "api": "healthy",
+    "database": "healthy",
     "mlService": "healthy"
   }
 }
-```
-
-**Example:**
-
-```javascript
-const response = await fetch("http://localhost:5001/health");
-const data = await response.json();
-console.log(data);
 ```
 
 ---
 
 ## Error Responses
 
-All endpoints follow a consistent error response format:
+All endpoints return consistent error format:
 
 ```json
 {
   "success": false,
-  "error": "Error message",
-  "details": "Additional error details (optional)"
+  "error": "Error message here"
 }
 ```
 
-**Common HTTP Status Codes:**
-
-- `200`: Success
-- `201`: Created (for POST requests)
-- `400`: Bad Request (validation errors)
-- `401`: Unauthorized (missing or invalid token)
-- `404`: Not Found
-- `409`: Conflict (e.g., duplicate entry)
-- `500`: Internal Server Error
-- `503`: Service Unavailable (e.g., ML service down)
+**HTTP Status Codes:**
+- `200` - Success
+- `201` - Created
+- `400` - Bad Request (validation error)
+- `401` - Unauthorized (invalid/missing token)
+- `404` - Not Found
+- `409` - Conflict (duplicate entry)
+- `500` - Internal Server Error
+- `503` - Service Unavailable (ML service down)
 
 ---
 
-## Notes
+## Important Notes
 
-1. **Audio File Storage**: Audio files are temporarily stored during processing and immediately deleted after ML analysis. Only the analysis results (transcription, emotion scores, etc.) are stored in the database.
+1. **Audio Storage**: By default, audio is deleted after analysis. Users can enable storage in Settings.
 
-2. **Daily Entry Limit**: Only one mood entry per day is allowed per user. Attempting to create a second entry for the same day will return a 409 Conflict error.
+2. **Daily Limit**: One mood entry per user per day. Second attempt returns `409 Conflict`.
 
-3. **Pattern Detection**: Pattern detection (alerts) runs automatically after a user selects an emoji for their mood entry.
+3. **Pattern Detection**: Automatically runs after emoji selection to detect concerning patterns.
 
-4. **ML Service**: The ML service must be running separately on port 8000 (or configured URL) for audio analysis to work.
+4. **Time Zone**: All dates use IST (Indian Standard Time) for consistency.
 
-5. **Authentication**: All endpoints except `/health` and `/` require valid Clerk JWT authentication.
+5. **Authentication**: Clerk JWT required for all endpoints except `/health`.
+
+---
+
+## Quick Reference
+
+```bash
+# Authentication
+Authorization: Bearer <clerk_jwt>
+
+# Upload mood entry
+POST /api/moods (multipart/form-data)
+
+# Update entry with emoji
+PATCH /api/moods/:id
+
+# Get entries
+GET /api/moods?startDate=2024-11-01&limit=30
+
+# Get today's entry
+GET /api/moods/date/2024-11-16
+
+# Get progress
+GET /api/progress/summary?days=30
+
+# Get calendar
+GET /api/progress/calendar/2024/11
+
+# Get activities
+GET /api/activities
+
+# Update settings
+PATCH /api/settings
+```
