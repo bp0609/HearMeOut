@@ -59,6 +59,15 @@ export interface PatternAlert {
   detectedAt: string;
   message: string;
   suggestions: string[];
+  patternDetails?: {
+    consecutiveDays?: number;
+    dates?: string[];
+    emojis?: string[];
+    fromEmoji?: string;
+    toEmoji?: string;
+    fromDate?: string;
+    toDate?: string;
+  };
 }
 
 export interface UserSettings {

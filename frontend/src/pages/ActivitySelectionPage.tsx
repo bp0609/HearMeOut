@@ -4,10 +4,11 @@ import { Sparkles, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ActivitySelector } from '@/components/ActivitySelector';
+import { LowMoodAlertDialog } from '@/components/LowMoodAlertDialog';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 import { getEmotionFromEmoji, EMOTIONS } from '@/lib/constants';
-import type { Activity, MoodEntry } from '@/types';
+import type { Activity, MoodEntry, PatternAlert } from '@/types';
 
 export default function ActivitySelectionPage() {
     const navigate = useNavigate();
@@ -23,6 +24,10 @@ export default function ActivitySelectionPage() {
     // Get mood color from navigation state, or use default
     const moodColorFromState = location.state?.moodColor;
     const [moodColor, setMoodColor] = useState<string>(moodColorFromState || '#a855f7');
+
+    // Alert state
+    const [lowMoodAlert, setLowMoodAlert] = useState<PatternAlert | null>(null);
+    const [showAlertDialog, setShowAlertDialog] = useState(false);
 
     // Fetch activities on mount
     useEffect(() => {
@@ -64,7 +69,26 @@ export default function ActivitySelectionPage() {
                 description: 'Your daily check-in is complete',
             });
 
-            navigate('/');
+            // Check for low mood alerts after saving
+            try {
+                const alerts = await api.getAlerts();
+                const consecutiveLowAlert = alerts.find(
+                    alert => alert.alertType === 'consecutive_low'
+                );
+
+                if (consecutiveLowAlert) {
+                    // Show the alert dialog instead of navigating immediately
+                    setLowMoodAlert(consecutiveLowAlert);
+                    setShowAlertDialog(true);
+                } else {
+                    // No alerts, navigate home
+                    navigate('/');
+                }
+            } catch (alertError) {
+                console.error('Error fetching alerts:', alertError);
+                // Even if alert fetch fails, navigate home
+                navigate('/');
+            }
         } catch (error) {
             console.error('Error saving activities:', error);
             toast({
@@ -83,6 +107,21 @@ export default function ActivitySelectionPage() {
             description: 'You can add activities later from the calendar',
         });
         navigate('/');
+    };
+
+    const handleDismissAlert = async () => {
+        if (!lowMoodAlert) return;
+
+        try {
+            await api.dismissAlert(lowMoodAlert.id);
+            setShowAlertDialog(false);
+            navigate('/');
+        } catch (error) {
+            console.error('Error dismissing alert:', error);
+            // Still navigate even if dismiss fails
+            setShowAlertDialog(false);
+            navigate('/');
+        }
     };
 
     if (loading) {
@@ -173,6 +212,13 @@ export default function ActivitySelectionPage() {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* Low Mood Alert Dialog */}
+                <LowMoodAlertDialog
+                    alert={lowMoodAlert}
+                    open={showAlertDialog}
+                    onDismiss={handleDismissAlert}
+                />
             </div>
         </div>
     );
