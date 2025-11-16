@@ -76,6 +76,7 @@ export async function checkForPatterns(
         await prisma.patternAlert.create({
           data: {
             userId,
+            triggeredByEntryId: newEntry.id,
             alertType: 'consecutive_low',
             patternDetails: {
               consecutiveDays: consecutiveLowDays,
@@ -87,12 +88,12 @@ export async function checkForPatterns(
           },
         });
 
-        console.log(`Pattern alert created for user ${userId}: ${consecutiveLowDays} consecutive low-mood days`);
+        console.log(`Pattern alert created for user ${userId}: ${consecutiveLowDays} consecutive low-mood days (triggered by entry ${newEntry.id})`);
       }
     }
 
     // Additional pattern: Sudden drop (good/great to low/terrible in 2 days)
-    await detectSuddenMoodDrop(userId, recentMoods, threshold);
+    await detectSuddenMoodDrop(userId, newEntry, recentMoods, threshold);
 
   } catch (error) {
     console.error('Pattern detection error:', error);
@@ -105,6 +106,7 @@ export async function checkForPatterns(
  */
 async function detectSuddenMoodDrop(
   userId: string,
+  newEntry: MoodEntry,
   recentMoods: MoodEntry[],
   threshold: number
 ): Promise<void> {
@@ -140,6 +142,7 @@ async function detectSuddenMoodDrop(
       await prisma.patternAlert.create({
         data: {
           userId,
+          triggeredByEntryId: newEntry.id,
           alertType: 'sudden_drop',
           patternDetails: {
             fromEmoji: previous.selectedEmoji,
@@ -150,7 +153,7 @@ async function detectSuddenMoodDrop(
         },
       });
 
-      console.log(`Sudden mood drop alert created for user ${userId}`);
+      console.log(`Sudden mood drop alert created for user ${userId} (triggered by entry ${newEntry.id})`);
     }
   }
 }
