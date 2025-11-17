@@ -4,6 +4,14 @@ A speech-based mental health monitoring web application that helps university st
 
 ---
 
+## 🔄 User Flow Demo
+
+<div align="center">
+  <img src="AppImages/UserFlow.gif" alt="HearMeOut User Flow Demo" width="800" style="border: 3px solid #4CAF50; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+  <p><em><strong>📱 See HearMeOut in action - Complete mood tracking workflow from recording to insights</strong></em></p>
+</div>
+---
+
 ## 📚 Documentation
 
 - **[Setup Guide](SETUP.md)** - Installation and configuration instructions
@@ -257,9 +265,7 @@ Complete control over your audio recordings:
 
 ---
 
-## 🔄 User Flow
-
-![User Flow](AppImages/UserFlow.gif)
+## 📝 Detailed User Journey
 
 ### Daily Check-In Flow
 
