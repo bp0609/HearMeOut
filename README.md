@@ -15,8 +15,8 @@ A speech-based mental health monitoring web application that helps university st
 
 ## 📚 Documentation
 
-- **[Setup Guide](SETUP.md)** - Installation and configuration instructions
-- **[API Documentation](API_DOCUMENTATION.md)** - Complete REST API reference with 24 endpoints covering mood entries, progress analytics, activities, settings, and audio management
+- **[Setup Guide](docs/SETUP.md)** - Installation and configuration instructions
+- **[API Documentation](docs/API_DOCUMENTATION.md)** - Complete REST API reference with 24 endpoints covering mood entries, progress analytics, activities, settings, and audio management
 - **[ML Service README](ml-service/README.md)** - ML service API documentation and emotion detection details
 
 ---
@@ -194,7 +194,7 @@ cd frontend && npm run dev
 
 > **Note:** ML service takes 1-2 minutes to load models on first startup. Check logs: `docker-compose logs -f ml-service`
 
-For detailed instructions, see [SETUP.md](SETUP.md)
+For detailed instructions, see [SETUP.md](docs/SETUP.md)
 
 ---
 
@@ -342,8 +342,9 @@ HearMeOut/
 │   └── wav2vec2-lg-xlsr-en-speech-emotion-recognition/
 │
 ├── docker-compose.yml        # PostgreSQL + ML Service
-├── SETUP.md                  # Setup guide
-├── API_DOCUMENTATION.md      # API reference
+├── docs/                     # Documentation
+│   ├── SETUP.md              # Setup guide
+│   └── API_DOCUMENTATION.md  # API reference
 └── Makefile                  # Development commands
 ```
 
