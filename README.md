@@ -47,7 +47,7 @@ A speech-based mental health monitoring web application that helps university st
 
 ### Overview
 
-![System Architecture](SystemArchitectureImages/sys-arch.png)
+![System Architecture](SystemArchitectureImages/SysArch.png)
 
 ### Detailed Architecture
 
@@ -61,7 +61,7 @@ A speech-based mental health monitoring web application that helps university st
 
 #### Frontend
 
-- React SPA with TypeScript
+- React with TypeScript
 - Real-time speech-to-text using Web Speech API
 - Interactive calendar with mood visualization
 - Progress analytics with charts
@@ -73,7 +73,7 @@ A speech-based mental health monitoring web application that helps university st
 - Prisma ORM for database operations
 - Pattern detection service for mood analysis
 - File upload handling with Multer
-- JWT-based authentication
+- JWT-based authentication using Clerk Node SDK
 
 #### ML Service
 
@@ -193,7 +193,7 @@ For detailed instructions, see [SETUP.md](SETUP.md)
 
 ### Voice-Based Mood Tracking
 
-Record 30-60 second daily check-ins with your voice. Choose from English, Hindi, or Gujarati.
+Record 30-60 second daily check-ins with your voice.
 
 ![Recording Interface](AppImages/7.png)
 
@@ -201,25 +201,25 @@ Record 30-60 second daily check-ins with your voice. Choose from English, Hindi,
 
 Real-time transcription of your voice using Web Speech API.
 
-![Speech-to-Text](AppImages/8.png)
+![Speech-to-Text](AppImages/9.png)
 
 ### AI Emotion Analysis
 
 Automatic emotion detection using wav2vec2 model with confidence scores for 8 emotions.
 
-![Emotion Analysis](AppImages/11.png)
+![Emotion Analysis](AppImages/13.png)
 
 ### Interactive Calendar
 
 Visual mood history with emoji stickers for each day.
 
-![Calendar View](AppImages/4.png)
+![Calendar View](AppImages/29.png)
 
 ### Activity Tracking
 
 Associate your moods with activities like exercise, social time, work, hobbies, and more.
 
-![Activity Selection](AppImages/12.png)
+![Activity Selection](AppImages/16.png)
 
 ### Progress Analytics
 
@@ -228,24 +228,19 @@ Comprehensive analytics with multiple visualizations:
 - **Mood Distribution** - Pie charts showing emotion frequency
 - **Weekday Trends** - See which days you feel best/worst
 - **Mood Timeline** - Track emotional changes over time
-- **Activity Statistics** - View most frequent activities
 - **Mood-Activity Correlation** - Discover which activities improve your mood
 
-![Progress Dashboard](AppImages/14.png)
+![Progress Dashboard](AppImages/34.png)
 
-![Mood Distribution](AppImages/15.png)
+![Mood Distribution](AppImages/35.png)
+![Mood Distribution](AppImages/36.png)
+![Mood Distribution](AppImages/39.png)
 
 ### Pattern Detection
 
 Get alerts when concerning patterns emerge, such as consecutive low mood days.
 
-![Pattern Alerts](AppImages/18.png)
-
-### Multilingual Support
-
-Available in English, Hindi, and Gujarati.
-
-![Language Selection](AppImages/22.png)
+![Pattern Alerts](AppImages/41.png)
 
 ### Privacy Controls & Audio Management
 
@@ -257,11 +252,8 @@ Complete control over your audio recordings:
 - **Playback** - Listen to past recordings anytime
 - **Delete Anytime** - Remove individual recordings or disable storage to delete all
 
-![Privacy Settings](AppImages/29.png)
-
-### Application Screenshots
-
-![App Overview](SystemArchitectureImages/appScreenshots.png)
+![Privacy Settings](AppImages/25.png)
+![Data History](AppImages/21.png)
 
 ---
 
