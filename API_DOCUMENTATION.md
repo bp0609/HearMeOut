@@ -4,10 +4,22 @@ Complete API reference for HearMeOut backend.
 
 **Base URL:** `http://localhost:5001`
 
-**Authentication:** All endpoints except `/health` require Clerk JWT token:
 ```
 Authorization: Bearer <clerk_jwt_token>
 ```
+
+---
+
+## Table of Contents
+
+1. [Mood Entry APIs](#mood-entry-apis) - Create, update, retrieve, and delete mood entries
+2. [Progress & Analytics APIs](#progress--analytics-apis) - Get insights, trends, and pattern alerts
+3. [Activities APIs](#activities-apis) - Manage activities and view statistics
+4. [Settings APIs](#settings-apis) - User preferences and consent management
+5. [Audio Recording APIs](#audio-recording-apis) - Manage stored audio recordings
+6. [Error Responses](#error-responses) - Standard error formats
+7. [Important Notes](#important-notes) - Key information about the API
+8. [Quick Reference](#quick-reference) - All endpoints at a glance
 
 ---
 
@@ -20,6 +32,7 @@ Authorization: Bearer <clerk_jwt_token>
 Upload audio and create mood entry with ML analysis.
 
 **Request:**
+
 ```bash
 curl -X POST http://localhost:5001/api/moods \
   -H "Authorization: Bearer <token>" \
@@ -29,11 +42,13 @@ curl -X POST http://localhost:5001/api/moods \
 ```
 
 **Request Fields:**
+
 - `audio` (file): Audio file (WAV, WEBM, OGG, MP3) - Max 10MB
 - `language` (string): `en`, `hi`, or `gu`
 - `duration` (number): 30-60 seconds
 
 **Response:** `201 Created`
+
 ```json
 {
   "success": true,
@@ -55,6 +70,7 @@ curl -X POST http://localhost:5001/api/moods \
 ```
 
 **Errors:**
+
 - `400` - Invalid file or missing fields
 - `409` - Entry already exists for today
 - `500` - ML service unavailable
@@ -68,6 +84,7 @@ curl -X POST http://localhost:5001/api/moods \
 Update mood entry with selected emoji and activities.
 
 **Request:**
+
 ```bash
 curl -X PATCH http://localhost:5001/api/moods/clp8k9xyz... \
   -H "Authorization: Bearer <token>" \
@@ -79,6 +96,7 @@ curl -X PATCH http://localhost:5001/api/moods/clp8k9xyz... \
 ```
 
 **Request Body:**
+
 ```json
 {
   "selectedEmoji": "😊",
@@ -87,6 +105,7 @@ curl -X PATCH http://localhost:5001/api/moods/clp8k9xyz... \
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -110,17 +129,20 @@ curl -X PATCH http://localhost:5001/api/moods/clp8k9xyz... \
 Get mood entries with optional date filtering.
 
 **Query Parameters:**
+
 - `startDate` (optional): `YYYY-MM-DD`
 - `endDate` (optional): `YYYY-MM-DD`
 - `limit` (optional): Max entries (default: 30)
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/moods?startDate=2024-11-01&limit=10 \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -130,9 +152,7 @@ curl http://localhost:5001/api/moods?startDate=2024-11-01&limit=10 \
       "entryDate": "2024-11-16",
       "dayOfWeek": "Sat",
       "selectedEmoji": "😊",
-      "activities": [
-        { "key": "exercise", "label": "Exercise", "icon": "🏃" }
-      ],
+      "activities": [{ "key": "exercise", "label": "Exercise", "icon": "🏃" }],
       "duration": 45,
       "language": "en",
       "createdAt": "2024-11-16T10:30:00Z"
@@ -150,12 +170,14 @@ curl http://localhost:5001/api/moods?startDate=2024-11-01&limit=10 \
 Get entry for specific date.
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/moods/date/2024-11-16 \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -180,12 +202,14 @@ Returns `data: null` if no entry exists.
 Delete a mood entry and associated audio file (if stored).
 
 **Request:**
+
 ```bash
 curl -X DELETE http://localhost:5001/api/moods/clp8k9xyz... \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -204,15 +228,18 @@ curl -X DELETE http://localhost:5001/api/moods/clp8k9xyz... \
 Mood distribution and statistics.
 
 **Query Parameters:**
+
 - `days` (optional): Analysis period (default: 30)
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/progress/summary?days=30 \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -238,12 +265,14 @@ curl http://localhost:5001/api/progress/summary?days=30 \
 Mood entries for calendar view.
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/progress/calendar/2024/11 \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -263,12 +292,14 @@ curl http://localhost:5001/api/progress/calendar/2024/11 \
 Pattern detection alerts (non-dismissed).
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/progress/alerts \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -287,6 +318,7 @@ curl http://localhost:5001/api/progress/alerts \
 ```
 
 **Alert Types:**
+
 - `consecutive_low` - Multiple low mood days in a row
 - `sudden_drop` - Abrupt change from positive to negative
 
@@ -299,16 +331,133 @@ curl http://localhost:5001/api/progress/alerts \
 Mark alert as dismissed.
 
 **Request:**
+
 ```bash
 curl -X POST http://localhost:5001/api/progress/alerts/alert_123/dismiss \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
   "message": "Alert dismissed successfully"
+}
+```
+
+---
+
+### Get Weekday Distribution
+
+`GET /api/progress/weekday-distribution`
+
+Get mood distribution grouped by day of week.
+
+**Query Parameters:**
+
+- `year` (optional): Filter by year
+- `month` (optional): Filter by month (1-12)
+
+**Request:**
+
+```bash
+curl http://localhost:5001/api/progress/weekday-distribution?year=2024&month=11 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "Sun": { "😊": 2, "😐": 1 },
+    "Mon": { "😢": 3, "😐": 2 },
+    "Tue": { "😊": 4, "😌": 1 },
+    "Wed": { "😐": 3 },
+    "Thu": { "😊": 2, "😢": 1 },
+    "Fri": { "😊": 5 },
+    "Sat": { "😌": 3, "😊": 2 }
+  }
+}
+```
+
+---
+
+### Get Mood Trend
+
+`GET /api/progress/mood-trend`
+
+Get mood trend over time with associated activities (for line charts).
+
+**Query Parameters:**
+
+- `year` (optional): Filter by year
+- `month` (optional): Filter by month (1-12)
+
+**Request:**
+
+```bash
+curl http://localhost:5001/api/progress/mood-trend?year=2024&month=11 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "date": "2024-11-01",
+      "emoji": "😊",
+      "activityKeys": ["exercise", "social"]
+    },
+    {
+      "date": "2024-11-02",
+      "emoji": "😐",
+      "activityKeys": ["work"]
+    }
+  ]
+}
+```
+
+---
+
+### Get Mood Counts
+
+`GET /api/progress/mood-counts`
+
+Get total count for each mood emoji.
+
+**Query Parameters:**
+
+- `year` (optional): Filter by year
+- `month` (optional): Filter by month (1-12)
+
+**Request:**
+
+```bash
+curl http://localhost:5001/api/progress/mood-counts?year=2024 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "moodCounts": {
+      "😊": 45,
+      "😐": 20,
+      "😢": 10,
+      "😌": 15,
+      "😠": 5
+    },
+    "totalEntries": 95
+  }
 }
 ```
 
@@ -323,56 +472,135 @@ curl -X POST http://localhost:5001/api/progress/alerts/alert_123/dismiss \
 List all available activities.
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/activities \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
+```json
+[
+  {
+    "key": "exercise",
+    "label": "Exercise",
+    "icon": "🏃",
+    "color": "#10B981",
+    "order": 1
+  },
+  {
+    "key": "social",
+    "label": "Social Time",
+    "icon": "👥",
+    "color": "#3B82F6",
+    "order": 2
+  },
+  {
+    "key": "work",
+    "label": "Work/Study",
+    "icon": "💼",
+    "color": "#8B5CF6",
+    "order": 3
+  }
+]
+```
+
+---
+
+### Get Activity Statistics
+
+`GET /api/activities/stats`
+
+Get activity frequency statistics for the authenticated user.
+
+**Query Parameters:**
+
+- `year` (optional): Filter by year
+- `month` (optional): Filter by month (1-12)
+
+**Request:**
+
+```bash
+curl http://localhost:5001/api/activities/stats?year=2024&month=11 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
 ```json
 {
-  "success": true,
-  "data": [
-    { "key": "exercise", "label": "Exercise", "icon": "🏃", "color": "#10B981" },
-    { "key": "social", "label": "Social Time", "icon": "👥", "color": "#3B82F6" },
-    { "key": "work", "label": "Work/Study", "icon": "💼", "color": "#8B5CF6" }
-  ]
+  "stats": [
+    {
+      "activityKey": "exercise",
+      "activity": {
+        "key": "exercise",
+        "label": "Exercise",
+        "icon": "🏃",
+        "color": "#10B981"
+      },
+      "count": 15,
+      "percentage": 50
+    },
+    {
+      "activityKey": "social",
+      "activity": {
+        "key": "social",
+        "label": "Social Time",
+        "icon": "👥",
+        "color": "#3B82F6"
+      },
+      "count": 10,
+      "percentage": 33
+    }
+  ],
+  "totalEntries": 30
 }
 ```
 
 ---
 
-### Create Activity
+### Get Mood-Activity Correlation
 
-`POST /api/activities`
+`GET /api/activities/mood-correlation`
 
-Create custom activity.
+Get correlation data showing average mood level for each activity.
+
+**Query Parameters:**
+
+- `year` (optional): Filter by year
+- `month` (optional): Filter by month (1-12)
 
 **Request:**
+
 ```bash
-curl -X POST http://localhost:5001/api/activities \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "key": "meditation",
-    "label": "Meditation",
-    "icon": "🧘",
-    "color": "#A855F7"
-  }'
+curl http://localhost:5001/api/activities/mood-correlation?year=2024 \
+  -H "Authorization: Bearer <token>"
 ```
 
-**Response:** `201 Created`
+**Response:** `200 OK`
+
 ```json
 {
-  "success": true,
-  "data": {
-    "key": "meditation",
-    "label": "Meditation",
-    "icon": "🧘",
-    "color": "#A855F7"
-  }
+  "correlations": [
+    {
+      "activityKey": "exercise",
+      "activity": { "key": "exercise", "label": "Exercise", "icon": "🏃" },
+      "averageMood": 7.5,
+      "count": 15
+    },
+    {
+      "activityKey": "work",
+      "activity": { "key": "work", "label": "Work/Study", "icon": "💼" },
+      "averageMood": 5.2,
+      "count": 20
+    }
+  ],
+  "totalEntries": 30
 }
 ```
+
+**Note:** Mood levels range from 1 (angry) to 9 (very calm/happy), with 5 being neutral.
 
 ---
 
@@ -385,12 +613,14 @@ curl -X POST http://localhost:5001/api/activities \
 Get user settings and preferences.
 
 **Request:**
+
 ```bash
 curl http://localhost:5001/api/settings \
   -H "Authorization: Bearer <token>"
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -414,6 +644,7 @@ curl http://localhost:5001/api/settings \
 Update user settings.
 
 **Request:**
+
 ```bash
 curl -X PATCH http://localhost:5001/api/settings \
   -H "Authorization: Bearer <token>" \
@@ -428,6 +659,7 @@ curl -X PATCH http://localhost:5001/api/settings \
 ```
 
 **Request Body:**
+
 ```json
 {
   "reminderEnabled": true,
@@ -439,6 +671,7 @@ curl -X PATCH http://localhost:5001/api/settings \
 ```
 
 **Fields:**
+
 - `reminderEnabled` (boolean): Daily reminders
 - `reminderTime` (string): 24-hour format `HH:MM`
 - `interventionThreshold` (number): Days before alert (3-14)
@@ -446,6 +679,7 @@ curl -X PATCH http://localhost:5001/api/settings \
 - `preferredLanguage` (string): `en`, `hi`, or `gu`
 
 **Response:** `200 OK`
+
 ```json
 {
   "success": true,
@@ -463,28 +697,143 @@ curl -X PATCH http://localhost:5001/api/settings \
 
 ---
 
-## Health Check
+### Set Audio Storage Consent
 
-`GET /health`
+`POST /api/settings/consent`
 
-Check API and ML service status. **No authentication required.**
+Set first-time audio storage consent.
 
 **Request:**
+
 ```bash
-curl http://localhost:5001/health
+curl -X POST http://localhost:5001/api/settings/consent \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "consent": true
+  }'
+```
+
+**Request Body:**
+
+```json
+{
+  "consent": true
+}
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
-  "status": "ok",
-  "timestamp": "2024-11-16T10:30:00Z",
-  "services": {
-    "database": "healthy",
-    "mlService": "healthy"
+  "success": true,
+  "data": {
+    "audioStorageConsent": true,
+    "audioStorageEnabled": true,
+    "consentGivenAt": "2024-11-16T10:30:00Z"
   }
 }
 ```
+
+**Note:** This endpoint is used when a user first enables audio storage. Setting consent to `true` also enables audio storage, while `false` keeps it disabled.
+
+---
+
+## Audio Recording APIs
+
+### Get Audio Recordings
+
+`GET /api/audio/recordings`
+
+Get all stored audio recordings for the authenticated user.
+
+**Request:**
+
+```bash
+curl http://localhost:5001/api/audio/recordings \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "recordings": [
+      {
+        "id": "clp8k9xyz...",
+        "entryDate": "2024-11-16T00:00:00Z",
+        "dayOfWeek": "Sat",
+        "duration": 45,
+        "language": "en",
+        "selectedEmoji": "😊",
+        "createdAt": "2024-11-16T10:30:00Z",
+        "fileExists": true,
+        "audioFilePath": "temp_audio/user_xxx_123456.webm"
+      }
+    ],
+    "totalCount": 1
+  }
+}
+```
+
+**Note:** Returns empty array if audio storage is not enabled.
+
+---
+
+### Play Audio Recording
+
+`GET /api/audio/recordings/:entryId/play`
+
+Stream audio file for playback.
+
+**Request:**
+
+```bash
+curl http://localhost:5001/api/audio/recordings/clp8k9xyz.../play \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
+Returns audio stream with headers:
+
+- `Content-Type: audio/webm`
+- `Content-Length: <file_size>`
+- `Accept-Ranges: bytes`
+- `Cache-Control: no-cache`
+
+**Errors:**
+
+- `403` - Unauthorized to access this recording
+- `404` - Recording not found or audio file doesn't exist
+
+---
+
+### Delete Audio Recording
+
+`DELETE /api/audio/recordings/:entryId`
+
+Delete a specific audio recording file (keeps the mood entry).
+
+**Request:**
+
+```bash
+curl -X DELETE http://localhost:5001/api/audio/recordings/clp8k9xyz... \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Audio recording deleted successfully"
+}
+```
+
+**Note:** This only deletes the audio file, not the mood entry itself. Use `DELETE /api/moods/:id` to delete the entire mood entry.
 
 ---
 
@@ -500,6 +849,7 @@ All endpoints return consistent error format:
 ```
 
 **HTTP Status Codes:**
+
 - `200` - Success
 - `201` - Created
 - `400` - Bad Request (validation error)
@@ -527,31 +877,56 @@ All endpoints return consistent error format:
 
 ## Quick Reference
 
+### Mood Entry Endpoints
+
 ```bash
-# Authentication
-Authorization: Bearer <clerk_jwt>
+POST   /api/moods                    # Upload audio and create mood entry
+PATCH  /api/moods/:id                # Update entry with emoji/activities
+GET    /api/moods                    # Get mood entries (with filters)
+GET    /api/moods/date/:date         # Get entry for specific date
+DELETE /api/moods/:id                # Delete mood entry
+```
 
-# Upload mood entry
-POST /api/moods (multipart/form-data)
+### Progress & Analytics Endpoints
 
-# Update entry with emoji
-PATCH /api/moods/:id
+```bash
+GET    /api/progress/summary                  # Get mood distribution & stats
+GET    /api/progress/calendar/:year/:month    # Get calendar data
+GET    /api/progress/alerts                   # Get active pattern alerts
+POST   /api/progress/alerts/:id/dismiss       # Dismiss an alert
+GET    /api/progress/weekday-distribution     # Mood by day of week
+GET    /api/progress/mood-trend               # Mood trend over time
+GET    /api/progress/mood-counts              # Total count per emoji
+```
 
-# Get entries
-GET /api/moods?startDate=2024-11-01&limit=30
+### Activity Endpoints
 
-# Get today's entry
-GET /api/moods/date/2024-11-16
+```bash
+GET    /api/activities                # Get all activities
+GET    /api/activities/stats          # Get activity statistics
+GET    /api/activities/mood-correlation  # Mood-activity correlation
+```
 
-# Get progress
-GET /api/progress/summary?days=30
+### Settings Endpoints
 
-# Get calendar
-GET /api/progress/calendar/2024/11
+```bash
+GET    /api/settings         # Get user settings
+PATCH  /api/settings         # Update settings
+POST   /api/settings/consent # Set audio storage consent
+```
 
-# Get activities
-GET /api/activities
+### Audio Recording Endpoints
 
-# Update settings
-PATCH /api/settings
+```bash
+GET    /api/audio/recordings                # Get all recordings
+GET    /api/audio/recordings/:entryId/play # Stream audio file
+DELETE /api/audio/recordings/:entryId      # Delete audio file
+```
+
+### Authentication
+
+All endpoints except `/health` require:
+
+```bash
+Authorization: Bearer <clerk_jwt_token>
 ```

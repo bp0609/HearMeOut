@@ -1,50 +1,25 @@
-# HearMeOut - Daily Mood Journal 🎙️💚
+# HearMeOut: A mood journaling app
 
-A speech-based mental health monitoring web application that helps university students track their emotional well-being through daily voice recordings.
+A speech-based mental health monitoring web application that helps university students track their emotional well-being through daily voice recordings. Record your mood in 30-60 seconds, get AI-powered emotion analysis, and track patterns over time.
 
-## 🌟 Features
-
-- **Voice-Based Mood Tracking** - Record 30-60 second daily check-ins
-- **Live Speech-to-Text** - Real-time transcription using Web Speech API
-- **AI Emotion Analysis** - Automatic emotion detection using wav2vec2 model
-- **Interactive Calendar** - Visual mood history with emoji stickers
-- **Activity Tracking** - Associate moods with activities (exercise, social, work, etc.)
-- **Progress Analytics** - Mood distribution charts and statistics
-- **Pattern Detection** - Alerts when concerning patterns emerge
-- **Multilingual Support** - English, Hindi, and Gujarati
-- **Privacy-First** - Audio storage is optional and user-controlled
+---
 
 ## 📚 Documentation
 
 - **[Setup Guide](SETUP.md)** - Installation and configuration instructions
-- **[API Documentation](API_DOCUMENTATION.md)** - Complete API reference with examples
-- **[ML Service README](ml-service/README.md)** - ML service API documentation
+- **[API Documentation](API_DOCUMENTATION.md)** - Complete REST API reference with 24 endpoints covering mood entries, progress analytics, activities, settings, and audio management
+- **[ML Service README](ml-service/README.md)** - ML service API documentation and emotion detection details
 
-## 🏗️ Architecture
+---
 
-```
-┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│   Frontend  │ ◄────► │   Backend   │ ◄────► │ ML Service  │
-│ React + TS  │   API   │ Express+TS  │  HTTP   │ Flask+Python│
-└─────────────┘         └─────────────┘         └─────────────┘
-                              │
-                              ▼
-                        ┌─────────────┐
-                        │ PostgreSQL  │
-                        │  (Prisma)   │
-                        └─────────────┘
-```
-
-## 📦 Tech Stack
+## 🛠️ Tech Stack
 
 ### Frontend
 
 - **Framework**: React 18 + TypeScript + Vite
-- **Routing**: React Router v6
 - **UI**: Tailwind CSS + shadcn/ui
 - **Auth**: Clerk
 - **Charts**: Recharts
-- **HTTP**: Axios
 - **Speech-to-Text**: Web Speech API (browser-native)
 
 ### Backend
@@ -53,136 +28,266 @@ A speech-based mental health monitoring web application that helps university st
 - **ORM**: Prisma
 - **Database**: PostgreSQL 15
 - **Auth**: Clerk Node SDK
-- **Validation**: Zod
 - **File Upload**: Multer
 
 ### ML Service
 
 - **Framework**: Python Flask
-- **Emotion Model**: wav2vec2-lg-xlsr-en-speech-emotion-recognition
+- **Model**: wav2vec2-lg-xlsr-en-speech-emotion-recognition
 - **Audio Processing**: librosa, torch, transformers
 - **Supported Formats**: WAV, MP3, WebM, OGG
 
 ### Infrastructure
 
 - **Containerization**: Docker + Docker Compose
-- **Database**: PostgreSQL 15
 
-## 🚀 Quick Start
+---
+
+## 🏗️ System Architecture
+
+### Overview
+
+![System Architecture](SystemArchitectureImages/sys-arch.png)
+
+### Detailed Architecture
+
+![Detailed System Architecture](<SystemArchitectureImages/sys-arch(detailed).png>)
+
+### Docker Architecture
+
+![Docker Architecture](SystemArchitectureImages/DockerArch.png)
+
+### Components
+
+#### Frontend
+
+- React SPA with TypeScript
+- Real-time speech-to-text using Web Speech API
+- Interactive calendar with mood visualization
+- Progress analytics with charts
+- Clerk authentication integration
+
+#### Backend
+
+- RESTful API with Express.js
+- Prisma ORM for database operations
+- Pattern detection service for mood analysis
+- File upload handling with Multer
+- JWT-based authentication
+
+#### ML Service
+
+- Flask API for emotion detection
+- Pre-trained Wav2Vec2 model
+- 8 emotion classifications
+- Confidence scoring for each emotion
+
+#### Database
+
+- PostgreSQL with Prisma schema
+- User settings and preferences
+- Mood entries with activities
+- Pattern alerts tracking
+
+![Database Schema](SystemArchitectureImages/DBSchema.png)
+
+### API Flow
+
+![API Flows](SystemArchitectureImages/APIFlows.png)
+
+### ML Model Output
+
+![Model Output](SystemArchitectureImages/ModelOutput.png)
+
+---
+
+## 🚀 Setup
 
 ### Prerequisites
 
 - Node.js 18+ and npm
 - Python 3.10+
 - Docker and Docker Compose
-- Clerk account (free)
+- Clerk account (free at [clerk.com](https://clerk.com))
 
-### Setup
+### Quick Start
+
+**1. Clone repository**
 
 ```bash
-# 1. Clone repository
 git clone <repository-url>
 cd HearMeOut
+```
 
-# 2. Install dependencies
-cd backend && npm install
-cd ../frontend && npm install
+**2. Get Clerk API Keys**
 
-# 3. Configure Clerk (see SETUP.md for details)
-# Add CLERK_SECRET_KEY to backend/.env
-# Add VITE_CLERK_PUBLISHABLE_KEY to frontend/.env
+- Sign up at [clerk.com](https://clerk.com)
+- Create a new application
+- Copy Publishable Key and Secret Key
 
-# 4. Start services
-docker-compose up -d          # Start PostgreSQL + ML Service
-cd backend && npx prisma migrate dev && npm run dev
+**3. Configure environment**
+
+Copy example files and update with your Clerk keys:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+Update `backend/.env`:
+
+```bash
+DATABASE_URL="postgresql://admin:devpassword@localhost:5432/mood_journal"
+CLERK_SECRET_KEY="sk_test_your_secret_key_here"  # Replace with your Clerk secret key
+ML_SERVICE_URL="http://ml-service:8000"
+PORT=5001
+```
+
+Update `frontend/.env`:
+
+```bash
+VITE_CLERK_PUBLISHABLE_KEY="pk_test_your_publishable_key_here"  # Replace with your Clerk publishable key
+VITE_API_URL="http://localhost:5001"
+```
+
+**4. Install dependencies**
+
+```bash
+make install
+# or manually: cd backend && npm install && cd ../frontend && npm install
+```
+
+**5. Download ML Model**
+
+Download the pre-trained model from [OneDrive Link](https://iitgnacin-my.sharepoint.com/:u:/g/personal/22110098_iitgn_ac_in1/ERKzT030GVdHo8w0YrRFEvABpVxMuRPxxTZjXlU1SLsi7w?e=ppMZGc) and extract to `ml-service/wav2vec2-lg-xlsr-en-speech-emotion-recognition/` folder.
+
+**6. Start services**
+
+```bash
+# Start Docker services (PostgreSQL + ML Service)
+make docker-up
+
+# Setup database (first time only)
+make db-migrate
+
+# Start backend (Terminal 1)
+cd backend && npm run dev
+
+# Start frontend (Terminal 2)
 cd frontend && npm run dev
 ```
 
-**Access:**
+**Access the application:**
+
 - Frontend: http://localhost:5173
-- Backend: http://localhost:5001
+- Backend API: http://localhost:5001
 - ML Service: http://localhost:8000
 
-**Detailed instructions:** See [SETUP.md](SETUP.md)
+> **Note:** ML service takes 1-2 minutes to load models on first startup. Check logs: `docker-compose logs -f ml-service`
 
-## 🗂️ Project Structure
+For detailed instructions, see [SETUP.md](SETUP.md)
 
-```
-HearMeOut/
-├── backend/                   # Express + TypeScript API
-│   ├── prisma/schema.prisma  # Database schema
-│   ├── src/
-│   │   ├── routes/           # API endpoints
-│   │   ├── services/         # Business logic (ML, pattern detection)
-│   │   ├── middleware/       # Auth, error handling, file upload
-│   │   └── utils/            # Date/time utilities
-│   └── temp_audio/           # Temporary audio storage
-│
-├── frontend/                  # React + TypeScript + Vite
-│   ├── src/
-│   │   ├── pages/            # Route pages
-│   │   ├── components/       # UI components
-│   │   ├── hooks/            # Custom hooks
-│   │   └── lib/              # API client, utilities
-│   └── ...
-│
-├── ml-service/               # Flask + PyTorch emotion detection
-│   ├── app.py               # Flask API
-│   ├── config.py            # Configuration
-│   ├── test_api.py          # API tests
-│   └── wav2vec2-lg-xlsr-en-speech-emotion-recognition/  # Model files
-│
-├── docker-compose.yml        # PostgreSQL + ML Service
-├── Makefile                  # Development commands
-├── SETUP.md                  # Setup guide
-└── API_DOCUMENTATION.md      # API reference
-```
+---
 
-## 📝 API Overview
+## ✨ Features
 
-All endpoints require Clerk JWT authentication except `/health`.
+### Voice-Based Mood Tracking
 
-### Key Endpoints
+Record 30-60 second daily check-ins with your voice. Choose from English, Hindi, or Gujarati.
 
-**Mood Entries:**
-- `POST /api/moods` - Upload audio and create mood entry
-- `PATCH /api/moods/:id` - Update mood entry (emoji, activities)
-- `GET /api/moods` - Get mood entries with filters
-- `GET /api/moods/date/:date` - Get mood entry for specific date
+![Recording Interface](AppImages/7.png)
 
-**Progress:**
-- `GET /api/progress/summary` - Mood distribution and statistics
-- `GET /api/progress/calendar/:year/:month` - Calendar view data
-- `GET /api/progress/alerts` - Active pattern alerts
-- `POST /api/progress/alerts/:id/dismiss` - Dismiss alert
+### Live Speech-to-Text
 
-**Activities:**
-- `GET /api/activities` - List available activities
-- `POST /api/activities` - Create custom activity
+Real-time transcription of your voice using Web Speech API.
 
-**Settings:**
-- `GET /api/settings` - Get user settings
-- `PATCH /api/settings` - Update settings
+![Speech-to-Text](AppImages/8.png)
 
-**Complete API documentation:** [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
+### AI Emotion Analysis
 
-## 🎯 User Flow
+Automatic emotion detection using wav2vec2 model with confidence scores for 8 emotions.
 
-### Daily Check-In
+![Emotion Analysis](AppImages/11.png)
 
-1. **Home** - View calendar with mood history
-2. **Record** - Choose language and record 30-60 second voice note with live transcription
-3. **Processing** - ML service analyzes audio and suggests emojis (8 emotions)
-4. **Select** - Choose emoji that represents your mood
-5. **Activities** - Optionally add activity tags (exercise, social, work, etc.)
-6. **Done** - Entry appears on calendar
+### Interactive Calendar
 
-### Other Features
+Visual mood history with emoji stickers for each day.
 
-- **Progress** - View mood distribution charts and statistics
-- **Alerts** - Pattern detection alerts for consecutive low moods
-- **Settings** - Audio storage consent, reminder preferences, language
-- **Data History** - View and manage past mood entries
+![Calendar View](AppImages/4.png)
+
+### Activity Tracking
+
+Associate your moods with activities like exercise, social time, work, hobbies, and more.
+
+![Activity Selection](AppImages/12.png)
+
+### Progress Analytics
+
+Comprehensive analytics with multiple visualizations:
+
+- **Mood Distribution** - Pie charts showing emotion frequency
+- **Weekday Trends** - See which days you feel best/worst
+- **Mood Timeline** - Track emotional changes over time
+- **Activity Statistics** - View most frequent activities
+- **Mood-Activity Correlation** - Discover which activities improve your mood
+
+![Progress Dashboard](AppImages/14.png)
+
+![Mood Distribution](AppImages/15.png)
+
+### Pattern Detection
+
+Get alerts when concerning patterns emerge, such as consecutive low mood days.
+
+![Pattern Alerts](AppImages/18.png)
+
+### Multilingual Support
+
+Available in English, Hindi, and Gujarati.
+
+![Language Selection](AppImages/22.png)
+
+### Privacy Controls & Audio Management
+
+Complete control over your audio recordings:
+
+- **Optional Audio Storage** - Choose whether to store recordings
+- **Consent Management** - Clear consent process for audio storage
+- **View Recordings** - Access all your stored audio files
+- **Playback** - Listen to past recordings anytime
+- **Delete Anytime** - Remove individual recordings or disable storage to delete all
+
+![Privacy Settings](AppImages/29.png)
+
+### Application Screenshots
+
+![App Overview](SystemArchitectureImages/appScreenshots.png)
+
+---
+
+## 🔄 User Flow
+
+![User Flow](AppImages/UserFlow.gif)
+
+### Daily Check-In Flow
+
+1. **Home** - View calendar with mood history and current streak
+2. **Record** - Choose language and record 30-60 second voice note
+3. **Transcription** - Watch live speech-to-text as you speak
+4. **Processing** - ML service analyzes audio and suggests emotions
+5. **Select Emoji** - Choose the emoji that best represents your mood
+6. **Add Activities** - Optionally tag activities related to your mood
+7. **Complete** - Entry saved and appears on calendar
+
+### Additional Features
+
+- **Progress Tab** - View mood distribution, weekday trends, timeline charts, and activity statistics
+- **Pattern Alerts** - Receive notifications for concerning mood patterns with helpful suggestions
+- **Settings** - Manage audio storage consent, reminders, intervention thresholds, and language preferences
+- **Audio Library** - View, playback, and manage all stored audio recordings
+- **Data Management** - View, edit, and delete past mood entries
+
+---
 
 ## 🔒 Privacy & Security
 
@@ -192,60 +297,89 @@ By default, audio files are deleted immediately after ML analysis:
 
 1. Audio uploaded → Saved to `backend/temp_audio/`
 2. ML analyzes → Emotion scores extracted
-3. Audio deleted → Only emoji is stored in database
+3. Audio file deleted (unless storage enabled)
 
-**Optional Audio Storage:** Users can consent to audio storage in Settings. When enabled, audio files are retained. When disabled, all stored audio is automatically deleted.
+**Optional Audio Storage:**
+
+- Users must explicitly consent to audio storage in Settings
+- When enabled, audio files are retained and accessible via Audio Library
+- Users can view all recordings, play them back, or delete individual files
+- When storage is disabled, all stored audio is automatically deleted
+- Provides complete transparency and control over personal data
 
 ### Authentication
 
-- Clerk manages authentication and user sessions
+- Clerk manages all authentication and user sessions
 - All API endpoints validate JWT tokens
-- User data isolated by Clerk user ID
+- User data is isolated by Clerk user ID
+- Secure, privacy-first design
+
+---
+
+## 🗂️ Project Structure
+
+```
+HearMeOut/
+├── backend/                   # Express + TypeScript API
+│   ├── prisma/schema.prisma  # Database schema
+│   ├── src/
+│   │   ├── routes/           # API endpoints (mood, progress, activities, settings, audio)
+│   │   ├── services/         # Business logic (ML, pattern detection, Prisma)
+│   │   ├── middleware/       # Auth, error handling, file upload
+│   │   └── utils/            # Date utilities
+│   └── temp_audio/           # Temporary/stored audio files
+│
+├── frontend/                  # React + TypeScript + Vite
+│   ├── src/
+│   │   ├── pages/            # Route pages
+│   │   ├── components/       # UI components
+│   │   ├── hooks/            # Custom hooks
+│   │   └── lib/              # API client, utilities
+│   └── ...
+│
+├── ml-service/               # Flask + PyTorch
+│   ├── app.py               # Flask API
+│   ├── config.py            # Configuration
+│   └── wav2vec2-lg-xlsr-en-speech-emotion-recognition/
+│
+├── docker-compose.yml        # PostgreSQL + ML Service
+├── SETUP.md                  # Setup guide
+├── API_DOCUMENTATION.md      # API reference
+└── Makefile                  # Development commands
+```
+
+---
 
 ## 🧪 Development
 
-### Makefile Commands
+### Useful Commands
 
 ```bash
-make help          # Show all commands
-make install       # Install all dependencies
-make docker-up     # Start Docker services
-make docker-down   # Stop Docker services
-make db-migrate    # Run database migrations
-make test-ml       # Test ML service
-make clean         # Clean temp files
+# View all commands
+make help
+
+# Setup & Installation
+make install        # Install all dependencies
+make docker-up      # Start Docker services
+make db-migrate     # Run database migrations
+
+# Database Management
+make db-reset       # Reset database (with confirmation)
+
+# Docker Operations
+make docker-down    # Stop Docker services
+make docker-logs    # View Docker logs (live)
+
+# Testing & Utilities
+make test-ml        # Test ML service
+make clean          # Clean temp files and build artifacts
+
+# Manual Commands
+cd backend && npx prisma migrate dev --name migration_name  # Create new migration
+docker-compose ps                                           # List running services
 ```
 
-See [SETUP.md](SETUP.md) for detailed development workflow.
-
-## 🐛 Troubleshooting
-
-**ML Service timeout:** First startup takes 1-2 minutes to load models. Check logs: `docker-compose logs ml-service`
-
-**Database errors:** Ensure PostgreSQL is running: `docker ps`
-
-**Clerk auth fails:** Verify `.env` files have correct keys from Clerk dashboard
-
-**Microphone not working:** Use Chrome/Edge, check browser permissions, ensure HTTPS or localhost
-
-**Complete troubleshooting guide:** [SETUP.md](SETUP.md)
-
-## 📊 Database Schema
-
-**User** - Clerk user references and timestamps  
-**MoodEntry** - Daily entries with emoji, audio path (optional), language, activities  
-**Activity** - Predefined activities (exercise, social, work, etc.)  
-**MoodEntryActivity** - Many-to-many relation between moods and activities  
-**PatternAlert** - Detected mood patterns requiring attention  
-**UserSettings** - User preferences and privacy controls
-
-See `backend/prisma/schema.prisma` for complete schema.
-
-## 🌍 Supported Languages
-
-- English (`en`)
-- Hindi (`hi`)
-- Gujarati (`gu`)
+---
 
 ## 📄 License
 
@@ -254,8 +388,3 @@ MIT License - See [LICENSE](LICENSE) file for details.
 ---
 
 **Disclaimer:** This is a mood tracking tool, not a diagnostic or treatment application. If you're experiencing mental health concerns, please consult a qualified mental health professional.
-
-**Crisis Resources:**
-- National Suicide Prevention Lifeline: 988
-- Crisis Text Line: Text HOME to 741741
-- International: [findahelpline.com](https://findahelpline.com)
